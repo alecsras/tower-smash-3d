@@ -1,0 +1,18 @@
+{
+  "name": "tower-smash-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile 3D physics destruction game: build towers (up to 12,000 blocks) and smash them.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "npx --yes serve dist"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.14.0",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

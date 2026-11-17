@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { makePhysics, V3, Q4, GRAV } from './phys.js';
 try { await RAPIER.init(); } catch (e) { document.getElementById('err').style.display = 'flex'; throw e; }
 
@@ -36,11 +40,12 @@ const PROJ = {
   anvil:   { label: 'Anvil',      shape: 'box', size: [1.1, .7, .6],  mass: 25, rest: 0 },
   boulder: { label: 'Boulder',    shape: 'rock', r: .6, mass: 30, rest: .05 },
   bomb:    { label: 'Bomb',       shape: 'sphere', r: .36, mass: 2,  rest: .3, bomb: true },
-  cluster: { label: 'Cluster',    shape: 'sphere', r: .34, mass: 2.5, rest: .2, special: true },
-  rocket:  { label: 'Rocket',     shape: 'sphere', r: .22, mass: 4,  rest: 0, special: true },
-  meteor:  { label: 'Meteors',    shape: 'rock', r: .55, mass: 60, rest: 0, special: true },
-  hole:    { label: 'Black hole', shape: 'sphere', r: .4, mass: 3,  rest: .1, special: true },
-  nuke:    { label: 'Nuke',       shape: 'sphere', r: .55, mass: 30, rest: .1, special: true }
+  firebomb:{ label: 'Firebomb',   shape: 'sphere', r: .32, mass: 2,  rest: .2, special: true, desc: 'Sets wood ablaze — fire spreads, burns and crumbles' },
+  cluster: { label: 'Cluster',    shape: 'sphere', r: .34, mass: 2.5, rest: .2, special: true, desc: 'Splits into 9 bomblets mid-air' },
+  rocket:  { label: 'Rocket',     shape: 'sphere', r: .22, mass: 4,  rest: 0, special: true, desc: 'Flies dead straight — hold longer for more speed' },
+  meteor:  { label: 'Meteors',    shape: 'rock', r: .55, mass: 60, rest: 0, special: true, desc: '18 flaming meteors rain down on your target' },
+  hole:    { label: 'Black hole', shape: 'sphere', r: .4, mass: 3,  rest: .1, special: true, desc: 'Swallows everything nearby, then bursts' },
+  nuke:    { label: 'Nuke',       shape: 'sphere', r: .55, mass: 30, rest: .1, special: true, desc: 'Mushroom cloud, shockwave, total destruction' }
 };
 const SIZES = [['S', .6], ['M', 1], ['L', 1.6], ['XL', 2.5]];
 let buildR = 10; const MAX_H = 22, MIN_SPEED = 9, MAX_SPEED = 55, CHARGE_MS = 1300;
@@ -242,25 +247,31 @@ class Batch {
   constructor(geo, mat, cast) { this.geo = geo; this.mat = mat; this.cast = cast; this.items = []; this.cap = 0; this.mesh = null; this.grow(64); }
   grow(cap) {
     const m = new THREE.InstancedMesh(this.geo, this.mat, cap);
-    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = this.cast; m.receiveShadow = true; m.frustumCulled = false; m.userData.batch = this;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); m.castShadow = this.cast; m.receiveShadow = true; m.frustumCulled = false; m.userData.batch = this;
     if (this.mesh) {
-      m.instanceMatrix.array.set(this.mesh.instanceMatrix.array.subarray(0, this.items.length * 16));
+      m.instanceMatrix.array.set(this.mesh.instanceMatrix.array.subarray(0, this.items.length * 16)); m.instanceColor.array.set(this.mesh.instanceColor.array.subarray(0, this.items.length * 3));
       scene.remove(this.mesh); batchMeshes[batchMeshes.indexOf(this.mesh)] = m; this.mesh.dispose();
     } else batchMeshes.push(m);
     m.count = this.items.length; this.mesh = m; this.cap = cap; scene.add(m);
   }
-  add(o) { if (this.items.length >= this.cap) this.grow(this.cap * 2); o.batch = this; o.bi = this.items.length; this.items.push(o); this.mesh.count = this.items.length; o.mdirty = true; }
+  add(o) { if (this.items.length >= this.cap) this.grow(this.cap * 2); o.batch = this; o.bi = this.items.length; this.items.push(o); this.mesh.count = this.items.length; o.mdirty = true; o.cdirty = true; }
   remove(o) {
     const i = o.bi, last = this.items.pop();
-    if (last !== o) { this.items[i] = last; last.bi = i; last.mdirty = true; }
+    if (last !== o) { this.items[i] = last; last.bi = i; last.mdirty = true; last.cdirty = true; }
     this.mesh.count = this.items.length; o.batch = null;
   }
   sync() {
     let any = false;
-    for (const o of this.items) { if (!o.mdirty) continue; writeMatrix(o); any = true; }
+    let anyC = false; const ic = this.mesh.instanceColor;
+    for (const o of this.items) {
+      if (o.mdirty) { writeMatrix(o); any = true; }
+      if (o.cdirty) { const t = o.tint || WHITE3; ic.setXYZ(o.bi, t[0], t[1], t[2]); o.cdirty = false; anyC = true; }
+    }
     if (any) this.mesh.instanceMatrix.needsUpdate = true;
+    if (anyC) ic.needsUpdate = true;
   }
 }
+const WHITE3 = [1, 1, 1];
 function writeMatrix(o) {
   const b = o.body, k = o.pop ? Math.max(.01, 1 - o.pop * o.pop) : 1;
   _p.set(b.position.x, b.position.y, b.position.z); _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
@@ -395,9 +406,10 @@ let pendingBreak = new Set(), pendingBoom = [], simTime = 0;
 let shake = 0;
 const hintDone = { build: false, throw: false };
 
-function addObj(o) { o.body.userData = o; if (o.dormant) makeDormant(o); else o.body.attach(false); if (o.mesh) scene.add(o.mesh); else batchFor(o.spec).add(o); objs.push(o); return o; }
+function addObj(o) { o.createdT = simTime; o.body.userData = o; if (o.dormant) makeDormant(o); else o.body.attach(false); if (o.mesh) scene.add(o.mesh); else batchFor(o.spec).add(o); objs.push(o); return o; }
 function removeObj(o) {
   if (o.gone) return; o.gone = true;
+  recRemove(o); burning.delete(o);
   if (o.dormant) unDormant(o); else o.body.detach(); if (o.mesh) scene.remove(o.mesh); else if (o.batch) o.batch.remove(o);
 }
 function wakeAll() { for (const pb of P.bodies()) pb.wakeUp(); }
@@ -444,6 +456,7 @@ function dominoAssist() {
     }
   }
 }
+let lastBuzz = 0;
 function onHit(a, b, impact) { if (a && a.userData) handleHit(a.userData, b, impact); if (b && b.userData) handleHit(b.userData, a, impact); }
 function handleHit(o, other, impact) {
   if (o.gone) return;
@@ -451,6 +464,9 @@ function handleHit(o, other, impact) {
   const eff = impact * clamp(Math.sqrt(om / o.body.mass), .5, 3);
   if ((o.bomb || o.hole) && !o.fuse && o.launched) o.fuse = simTime + (o.rocket || o.meteor ? .01 : o.hole ? .05 : .18);
   if ((o.breakable && eff > 7) || (o.tnt && eff > 6)) pendingBreak.add(o);
+  if (o.type === 'blorb' && eff > 4.5) o.hitHard = true;
+  if (canFracture(o) && eff > (o.charred ? 5 : FRACT[o.mat])) pendingFracture.add(o);
+  if (o.type === 'proj' && impact > 9 && performance.now() - lastBuzz > 120) { lastBuzz = performance.now(); try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
   if (impact > 2.5 && o.type !== 'shard') {
     const t = performance.now();
     if (t - lastSnd > 40) {
@@ -487,7 +503,8 @@ function explode(o, power = 1) {
   if (o.gone) return;
   const c = o.body.position.clone(); removeObj(o);
   explodeAt(c, power);
-  if (o.nuke) nukeFX(c);
+  if (o.nuke) { nukeFX(c); igniteNear(c, 14, .8); }
+  if (o.fire) { igniteNear(c, 5.5, 1); for (let i = 0; i < 60; i++) spawnP(c.x + rand(-2, 2), c.y + rand(0, 1), c.z + rand(-2, 2), rand(-3, 3), rand(2, 6), rand(-3, 3), rand(.6, 1.2), [1, rand(.3, .6), .05], rand(.4, .8), 1, 1, .9); }
 }
 function explodeAt(c, power = 1) {
   const R = 5 * power, K = 26 * power;
@@ -500,7 +517,13 @@ function explodeAt(c, power = 1) {
     const w = q.body.angularVelocity; q.body.setAngularVelocity(w.x + rand(-6, 6) * f, w.y + rand(-6, 6) * f, w.z + rand(-6, 6) * f);
     if (q.breakable && dist < R * .6) pendingBreak.add(q);
     if (q.tnt && dist < R * .7 && !q.chain) { q.chain = true; pendingBoom.push({ o: q, t: simTime + rand(.08, .2) }); }
+    if (dist < R * .4 && canFracture(q) && Math.random() < .8) pendingFracture.add(q);
+    if (dist < R * .75) ignite(q, power > 2 ? .9 : .35);
+    if (q.type === 'blorb' && dist < R * .8) q.hitHard = true;
   }
+  recFx(c, power); explosionFX(c, power);
+}
+function explosionFX(c, power) {
   flashMesh.position.copy(c); flashMesh.visible = true; flashT = 1;
   flash.position.copy(c); flash.intensity = 60 * power;
   for (let i = 0; i < 70; i++) { const a = rand(0, 6.28), e = rand(-.3, 1.3), s = rand(3, 11) * power;
@@ -568,6 +591,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.fov = w / h < 1 ? 68 : 52; camera.updateProjectionMatrix();
   pMat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
 }
 addEventListener('resize', resize);
 
@@ -607,6 +631,7 @@ function placeAt(sx, sy) {
     }
   }
   if (top + hgt > MAX_H) { toast('Too tall — sky limit!'); return; }
+  if (duelBuild && duelUsed() + (spec.mat === 'tnt' ? 5 : 1) > duelBuild.budget) { toast('Budget used up — send it, or undo some blocks'); return; }
   const o = createPiece(spec, x, top + hgt / 2 + .005, z, qY(rot), calm);
   o.pop = 1; o.mdirty = true;
   placed.push(o); dirty = true; snd.place(); updateHud();
@@ -940,8 +965,8 @@ function rebuild() {
 // preset menu
 function openMenu() {
   const g = $('mgrid'); g.innerHTML = '';
-  { const b = document.createElement('button'); b.className = 'card mega custom chal'; b.innerHTML = '<span class="em">🏆</span><b>Challenge mode</b><small>10 levels · limited ammo · earn up to 3 stars each</small><i>' + Object.values(loadStars()).reduce((a, b) => a + b, 0) + ' / 30 ★</i>';
-    b.onclick = () => { closeMenu(); setTimeout(openLevels, 120); }; g.appendChild(b); }
+  { const b = document.createElement('button'); b.className = 'card mega custom chal'; b.innerHTML = '<span class="em">🏆</span><b>Campaign, challenges & daily</b><small>50 Blorb levels · 10 demolition challenges · a new city every day</small><i>' + (Object.values(SAVE.camp).reduce((a, b) => a + b, 0) + Object.values(loadStars()).reduce((a, b) => a + b, 0)) + ' / 180 ★</i>';
+    b.onclick = () => { closeMenu(); setTimeout(() => openLevels(), 120); }; g.appendChild(b); }
   { const b = document.createElement('button'); b.className = 'card mega custom'; b.innerHTML = '<span class="em">📐</span><b>Custom builder</b><small>Design your own: pick shape, size (e.g. 5×5×30), material & extras — or type a blueprint</small><i>up to 12,000 blocks</i>';
     b.onclick = () => { closeMenu(); setTimeout(openCustom, 120); }; g.appendChild(b); }
   for (const [title, list] of [['Mega builds · 500–5,000 blocks', PRESETS.filter(p => p.mega)], ['Classic builds', PRESETS.filter(p => !p.mega)]]) {
@@ -963,10 +988,11 @@ $('menu').addEventListener('click', e => { if (e.target.id === 'menu') closeMenu
 // Structures are described by a small command language, e.g.
 //   hollow 6x6x30 glass windows 3 floors 5 roof at -8,4
 // The form below writes these lines for you; the Blueprint box runs many lines at once.
-const CB_SHAPES = { solid: 'Solid', hollow: 'Tower', round: 'Round', pyramid: 'Pyramid', wall: 'Wall', stairs: 'Stairs' };
+const CB_SHAPES = { solid: 'Solid', hollow: 'Tower', round: 'Round', pyramid: 'Pyramid', wall: 'Wall', stairs: 'Stairs', slab: 'Slab' };
+let cbLastErr = '';
 const CB_MATS = ['stone', 'wood', 'glass', 'marble', 'concrete', 'sand', 'gold', 'tnt', 'striped', 'checker', 'random'];
 const CB_SHAPE_WORDS = { solid: 'solid', block: 'solid', cube: 'solid', box: 'solid', hollow: 'hollow', tower: 'hollow', building: 'hollow', house: 'hollow', keep: 'hollow',
-  round: 'round', cylinder: 'round', circle: 'round', silo: 'round', pyramid: 'pyramid', wall: 'wall', stairs: 'stairs', staircase: 'stairs', steps: 'stairs' };
+  round: 'round', cylinder: 'round', circle: 'round', silo: 'round', pyramid: 'pyramid', wall: 'wall', stairs: 'stairs', staircase: 'stairs', steps: 'stairs', slab: 'slab', deck: 'slab', platform: 'slab' };
 const CB_MAX_DIM = 40, CB_MAX_H = 60, CB_MAX_BLOCKS = 12000;
 const cbDefault = () => ({ shape: 'hollow', w: 5, l: 5, h: 30, mat: 'stone', x: 0, z: 0, up: 0, thick: 1, windows: 4, floors: 0, crenels: false, roof: true, tnt: false });
 
@@ -975,11 +1001,12 @@ function parseCmd(line) {
   c.windows = 0; c.roof = false;
   for (const [w, s] of Object.entries(CB_SHAPE_WORDS)) if (new RegExp('\\b' + w + '\\b').test(t)) { c.shape = s; break; }
   if (c.shape === 'wall') { c.w = 15; c.l = 1; c.h = 6; }
+  if (c.shape === 'slab') { c.w = 6; c.l = 6; c.h = 1; }
   // dimensions: 5x5x30, 5wx5lx30h, 30h x 5w x 5l, 12x6 (length x height for walls) ...
   const U = '\\s*(?:([wlh])(?![a-z]))?'; const dm = t.match(new RegExp('(\\d+)' + U + '\\s*x\\s*(\\d+)' + U + '(?:\\s*x\\s*(\\d+)' + U + ')?'));
   if (dm) {
     const nums = [[+dm[1], dm[2]], [+dm[3], dm[4]]]; if (dm[5]) nums.push([+dm[5], dm[6]]);
-    const order = nums.length === 3 ? ['w', 'l', 'h'] : (c.shape === 'pyramid' ? ['w', 'l'] : ['w', 'h']);
+    const order = nums.length === 3 ? ['w', 'l', 'h'] : (c.shape === 'pyramid' || c.shape === 'slab' ? ['w', 'l'] : ['w', 'h']);
     const used = new Set(nums.filter(n => n[1]).map(n => n[1]));
     const free = order.filter(k => !used.has(k)).concat(['w', 'l', 'h'].filter(k => !used.has(k) && !order.includes(k)));
     for (const [n, k] of nums) c[k || free.shift()] = n;
@@ -996,11 +1023,13 @@ function parseCmd(line) {
   c.roof = /\b(roof|spire|cone)\b/.test(t);
   c.tnt = /\btnt\s*core\b|\bcore\b/.test(t);
   c.w = clamp(Math.round(c.w), 1, CB_MAX_DIM); c.l = clamp(Math.round(c.l), 1, CB_MAX_DIM); c.h = clamp(Math.round(c.h), 1, CB_MAX_H);
+  if (c.shape === 'slab') c.h = clamp(c.h, 1, 3);
   c.thick = clamp(c.thick, 1, Math.max(1, Math.floor(Math.min(c.w, c.l) / 2)));
   return c;
 }
 function cfgToCmd(c) {
   const parts = [c.shape === 'hollow' ? 'tower' : c.shape, c.shape === 'pyramid' ? `${c.w}x${c.l}` : `${c.w}w x ${c.l}l x ${c.h}h`, c.mat];
+  if (c.shape === 'slab') parts[1] = `${c.w}x${c.l}x${c.h}`;
   if (c.thick > 1 && (c.shape === 'hollow' || c.shape === 'round')) parts.push('thick ' + c.thick);
   if (c.windows) parts.push('windows ' + c.windows);
   if (c.floors && (c.shape === 'hollow' || c.shape === 'round')) parts.push('floors ' + c.floors);
@@ -1019,6 +1048,7 @@ function genStructure(c) {
   return res;
 }
 function genStructure0(c) {
+  if (c.shape === 'slab') return [{ spec: Bx(DENS[c.mat] ? c.mat : 'stone', c.w * G - .01, c.h, c.l * G - .01), x: c.x, y: 0, z: c.z }];
   const out = [], R = rng(c.w * 73 + c.l * 31 + c.h * 7 + Math.round(c.x * 13 + c.z * 17) + c.shape.length);
   const matAt = (i, j, L) => {
     if (c.mat === 'striped') return L % 2 ? 'wood' : 'stone';
@@ -1114,7 +1144,7 @@ function runBlueprint(lines, { replace = false } = {}) {
   for (const raw of lines) { const l = raw.trim(); if (!l || l.startsWith('#') || l.startsWith('//')) continue; if (/^clear\b/i.test(l)) { doClear = true; continue; } cfgs.push(parseCmd(l)); }
   if (!cfgs.length) { if (doClear) { clearAll(); snapshot = null; dirty = true; updateHud(); toast('Cleared'); } return false; }
   const all = cfgs.map(genStructure), total = all.reduce((n, a) => n + a.length, 0);
-  if (total + (doClear ? 0 : objs.filter(o => !o.gone && o.type === 'block').length) > CB_MAX_BLOCKS) { toast(`Too big: ${total.toLocaleString()} blocks (max ${CB_MAX_BLOCKS.toLocaleString()})`); return false; }
+  if (total + (doClear ? 0 : objs.filter(o => !o.gone && o.type === 'block').length) > CB_MAX_BLOCKS) { cbLastErr = `Too big: ${total.toLocaleString()} blocks (max ${CB_MAX_BLOCKS.toLocaleString()})`; toast(cbLastErr); return false; }
   if (doClear) { clearAll(); snapshot = null; }
   const flat = all.flat();
   { // structures in one blueprint must not overlap each other
@@ -1122,11 +1152,11 @@ function runBlueprint(lines, { replace = false } = {}) {
     for (let k = 0; k < all.length; k++) {
       let clash = -1;
       for (const p of all[k]) { const a = pieceAABB(p); forCells(a, 0, key => { const l = hm.get(key); if (l) for (const [b, kk] of l) if (kk !== k && clash < 0 && overlap(a, b, -.06)) clash = kk; }); if (clash >= 0) break; }
-      if (clash >= 0) { toast(`Structures ${clash + 1} and ${k + 1} overlap — change “at” or “up”`); return false; }
+      if (clash >= 0) { cbLastErr = `Structures ${clash + 1} and ${k + 1} overlap — change “at” or “up”`; toast(cbLastErr); return false; }
       for (const p of all[k]) { const a = pieceAABB(p); forCells(a, 0, key => { let l = hm.get(key); if (!l) hm.set(key, l = []); l.push([a, k]); }); }
     }
   }
-  if (!doClear && spaceTaken(flat)) { toast('That spot is taken — move it, or turn on “Clear first”'); return false; }
+  if (!doClear && spaceTaken(flat)) { cbLastErr = 'That spot is taken — move it, or turn on “Clear first”'; toast(cbLastErr); return false; }
   let need = buildR, top = 0, ext = 6;
   for (const c of cfgs) { need = Math.max(need, Math.ceil(Math.max(Math.abs(c.x) + c.w / 2, Math.abs(c.z) + c.l / 2) + 1)); }
   for (const p of flat) { top = Math.max(top, p.y + specHeight(p.spec)); ext = Math.max(ext, Math.abs(p.x) + 1, Math.abs(p.z) + 1); }
@@ -1170,6 +1200,7 @@ function cbStepper(parent, label, val, min, max, on, step = 1) {
 function cbLabel(parent, txt) { const h = document.createElement('div'); h.className = 'lab'; h.textContent = txt; parent.appendChild(h); }
 function renderCustom() {
   const f = $('cform'), c = cbCfg; f.innerHTML = '';
+  renderAI(f);
   cbLabel(f, 'Shape');
   cbChips(f, Object.entries(CB_SHAPES), c.shape, k => {
     c.shape = k;
@@ -1388,6 +1419,9 @@ function makeSpecialMesh(kind) {
   } else if (kind === 'nuke') {
     const s = new THREE.Mesh(new THREE.SphereGeometry(p.r, 24, 16), SPMATS.nuke); s.scale.set(1, .85, 1); g.add(s);
     const fin = new THREE.Mesh(new THREE.CylinderGeometry(p.r * .55, p.r * .3, p.r * .7, 12), PMATS.bomb); fin.position.y = -p.r * .95; g.add(fin);
+  } else if (kind === 'firebomb') {
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(p.r, 18, 12), new THREE.MeshStandardMaterial({ color: 0x9c1d0e, emissive: 0xff4a10, emissiveIntensity: .5, roughness: .4 })));
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.08, .1, .28, 10), new THREE.MeshStandardMaterial({ color: 0x5a3a20 })); neck.position.y = p.r + .08; g.add(neck);
   } else if (kind === 'hole') {
     g.add(new THREE.Mesh(new THREE.SphereGeometry(p.r, 20, 14), SPMATS.hole));
     const ring = new THREE.Mesh(new THREE.TorusGeometry(p.r * 1.6, p.r * .18, 8, 32), SPMATS.holeRing); ring.rotation.x = Math.PI / 2.4; g.add(ring);
@@ -1419,6 +1453,7 @@ function throwSpecial(kind, vel, target, pw) {
     snd.rocket(); return;
   }
   if (kind === 'cluster') { spawnProj('cluster', o0, vel, { bomb: true, cluster: true, power: 1 }); snd.whoosh(); return; }
+  if (kind === 'firebomb') { spawnProj('firebomb', o0, vel, { bomb: true, fire: true, power: .75 }); snd.whoosh(); return; }
   if (kind === 'nuke') { spawnProj('nuke', o0, vel, { bomb: true, nuke: true, power: 3.2 }); snd.whoosh(); return; }
   if (kind === 'hole') { spawnProj('hole', o0, vel, { hole: true }); snd.whoosh(); return; }
 }
@@ -1602,6 +1637,7 @@ const SMASH_WORDS = ['MEGA SMASH!', 'DEMOLITION!', 'KABOOM!', 'TOTAL CHAOS!', 'O
 function comboCheck(down) {
   if (lastDown == null || down < lastDown) { lastDown = down; return; }
   const d = down - lastDown; lastDown = down;
+  if (d > 0 && !chal) { SAVE.coinFrac += d / 6; const c = Math.floor(SAVE.coinFrac); if (c) { SAVE.coinFrac -= c; addCoins(c, c >= 5); } }
   if (d < 3) return;
   const el = document.createElement('div'); el.className = 'pop'; el.textContent = '+' + d;
   el.style.left = `calc(50% + ${rand(-60, 60)}px)`; document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
@@ -1636,58 +1672,675 @@ const LEVELS = [
   { name: 'Metro Meltdown', preset: 'metropolis', ammo: [['hole', 1, 1], ['meteor', 1, 1]], stars: [20, 40, 60] },
   { name: 'Citadel Doom', preset: 'citadel', ammo: [['nuke', 1, 1]], stars: [40, 65, 85] }
 ];
-const loadStars = () => { try { return JSON.parse(localStorage.getItem('ts_stars') || '{}'); } catch (e) { return {}; } };
-const saveStars = s => { try { localStorage.setItem('ts_stars', JSON.stringify(s)); } catch (e) {} };
-function openLevels() {
-  const st = loadStars(), g = $('lgrid'); g.innerHTML = '';
-  LEVELS.forEach((L, i) => {
-    const best = st[i] || 0, locked = i > 0 && !(st[i - 1] > 0);
-    const b = document.createElement('button'); b.className = 'card lvl' + (locked ? ' locked' : '');
-    const ammo = L.ammo.map(([k, s, n]) => `${n}× ${['S', 'M', 'L', 'XL'][s]} ${PROJ[k].label}`).join(' + ');
-    b.innerHTML = `<span class="em">${locked ? '🔒' : i + 1}</span><b>${L.name}</b><small>${ammo}</small><i>${'★'.repeat(best)}${'☆'.repeat(3 - best)}</i>`;
-    b.onclick = () => { if (locked) { toast('Get ★ on the previous level first'); return; } $('levels').classList.remove('open'); setTimeout(() => startLevel(i), 60); };
-    g.appendChild(b);
-  });
-  $('levels').classList.add('open');
+// ---- save data, coins & shop ----
+const SAVE = (() => { let s = {}; try { s = JSON.parse(localStorage.getItem('ts_save') || '{}'); } catch (e) {} return Object.assign({ coins: 250, coinFrac: 0, unlocked: {}, sandbox: false, camp: {}, daily: {}, quality: matchMedia('(pointer:coarse)').matches ? 'low' : 'high' }, s); })();
+const persist = () => { try { localStorage.setItem('ts_save', JSON.stringify(SAVE)); } catch (e) {} };
+const PRICES = { firebomb: 120, cluster: 150, rocket: 200, meteor: 300, hole: 450, nuke: 700 };
+const isLocked = k => !chal && !SAVE.sandbox && PRICES[k] && !SAVE.unlocked[k];
+function addCoins(n, why) {
+  if (!n) return; SAVE.coins += n; persist(); updateCoins();
+  if (why) { const el = document.createElement('div'); el.className = 'pop coin'; el.textContent = `+${n} 🪙`; el.style.left = 'calc(100% - 60px)'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); }
 }
-$('levelsX').onclick = () => $('levels').classList.remove('open');
-$('levels').addEventListener('click', e => { if (e.target.id === 'levels') $('levels').classList.remove('open'); });
-function startLevel(i) {
-  const L = LEVELS[i]; clearFields(); $('result').classList.remove('open');
-  chal = null; setMode('build');
-  loadPreset(PRESETS.find(p => p.id === L.preset));
-  chal = { lv: i, ammo: L.ammo.map(([kind, size, n]) => ({ kind, size, n })), endAt: null, pct: 0 };
-  curProj = chal.ammo[0].kind; curSize = chal.ammo[0].size;
-  setMode('throw'); lastDown = null;
-  toast(`Level ${i + 1}: ${L.name} — ★ at ${L.stars[0]}%`);
+function updateCoins() { const b = $('coinBtn'); if (b) b.textContent = `🪙 ${SAVE.coins.toLocaleString()}`; }
+function openShop() {
+  const g = $('shopList'); g.innerHTML = '';
+  for (const [k, price] of Object.entries(PRICES)) {
+    const own = SAVE.unlocked[k] || SAVE.sandbox, row = document.createElement('div'); row.className = 'shoprow';
+    row.appendChild(iconFor(k, 'throw'));
+    row.insertAdjacentHTML('beforeend', `<div><b>${PROJ[k].label}</b><small>${PROJ[k].desc || ''}</small></div>`);
+    const b = document.createElement('button'); b.className = own ? 'b2' : 'b1'; b.textContent = own ? 'Owned' : `🪙 ${price}`; b.disabled = own;
+    b.onclick = () => { if (SAVE.coins < price) { toast(`Need ${price - SAVE.coins} more coins — smash stuff to earn them`); return; } SAVE.coins -= price; SAVE.unlocked[k] = true; persist(); updateCoins(); snd.ding(); openShop(); buildUI(); };
+    row.appendChild(b); g.appendChild(row);
+  }
+  $('sandboxChk').checked = SAVE.sandbox; $('qualityChk').checked = SAVE.quality === 'high';
+  $('shop').classList.add('open');
 }
-const ammoLeft = () => chal ? chal.ammo.reduce((n, a) => n + a.n, 0) : Infinity;
+$('shopX').onclick = () => $('shop').classList.remove('open');
+$('shop').addEventListener('click', e => { if (e.target.id === 'shop') $('shop').classList.remove('open'); });
+$('sandboxChk').onchange = e => { SAVE.sandbox = e.target.checked; persist(); openShop(); buildUI(); };
+$('qualityChk').onchange = e => { SAVE.quality = e.target.checked ? 'high' : 'low'; persist(); applyQuality(); };
+$('coinBtn').onclick = openShop;
+
+// ---- Blorbs: the little jelly targets of the campaign ----
+const blorbMat = new THREE.MeshStandardMaterial({ color: 0x5ed14a, roughness: .35, emissive: 0x0a3a05, emissiveIntensity: .4 });
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .2 }), pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+function makeBlorbMesh() {
+  const g = new THREE.Group(), r = .34;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), blorbMat); body.scale.set(1, .9, 1); g.add(body);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.1, 12, 10), eyeMat); eye.position.set(s * .12, .08, r * .85); g.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 6), pupilMat); pupil.position.set(s * .12, .08, r * .85 + .07); g.add(pupil);
+  }
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(.09, .018, 6, 12, Math.PI), pupilMat); smile.position.set(0, -.06, r * .9); smile.rotation.z = Math.PI; g.add(smile);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function spawnBlorb(x, y, z) {
+  const body = new P.PBody({ shape: { kind: 'ball', r: .34 }, mass: .5, pos: new V3(x, y + .35, z), quat: Q4.yaw(rand(0, 6.28)), rest: .2, fric: .7 });
+  const o = addObj({ body, dormant: true, mesh: makeBlorbMesh(), type: 'blorb' });
+  o.bhome = body.position.clone(); syncMesh(o);
+  return o;
+}
+function popBlorb(o) {
+  if (o.popped) return; o.popped = true;
+  const p = o.body.position;
+  for (let i = 0; i < 40; i++) spawnP(p.x, p.y, p.z, rand(-5, 5), rand(0, 7), rand(-5, 5), rand(.4, .9), [.35, .9, .3], rand(.12, .25), -14, 0);
+  if (!o.gone) removeObj(o);
+  snd.squish(); addCoins(5, true);
+  const el = document.createElement('div'); el.className = 'pop'; el.textContent = 'POP!'; el.style.left = `calc(50% + ${rand(-80, 80)}px)`; el.style.color = '#7dff5a';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1100);
+  if (chal) updateHud();
+}
+function checkBlorbs() {
+  if (!chal || !chal.blorbs) return;
+  for (const b of chal.blorbs) {
+    if (b.popped) continue;
+    if (b.gone || b.body.position.distanceTo(b.bhome) > 1.1 || b.body.position.y < b.bhome.y - .9 || b.hitHard) popBlorb(b);
+  }
+}
+
+// ---- generic challenge engine (campaign, demolition, daily, duels) ----
+// def: {title, setup(), ammo:[[kind,size,n]] | pool:{n, maxSize}, goal:'pct'|'blorb', stars:[..] (pct), onResult(res)->{msg,next,extra}, hud?}
+function startChallenge(def) {
+  clearFields(); $('result').classList.remove('open'); $('levels').classList.remove('open');
+  chal = null; setMode('build'); clearAll();
+  const before = objs.length; def.setup();
+  chal = { def, ammo: (def.ammo || []).map(([kind, size, n]) => ({ kind, size, n })), pool: def.pool ? { ...def.pool } : null, endAt: null, pct: 0, shown: false, shots: 0,
+    blorbs: objs.filter(o => o.type === 'blorb'), winAt: null };
+  if (chal.pool) { curProj = 'bomb'; curSize = 1; } else { curProj = chal.ammo[0].kind; curSize = chal.ammo[0].size; }
+  setMode('throw'); lastDown = null; updateHud();
+  toast(def.title + (def.goal === 'blorb' ? ` — pop all ${chal.blorbs.length} Blorbs!` : ` — ★ at ${def.stars[0]}%`));
+}
+const ammoLeft = () => !chal ? Infinity : chal.pool ? chal.pool.n : chal.ammo.reduce((n, a) => n + a.n, 0);
+const ammoTotal = () => !chal ? 0 : chal.pool ? chal.def.pool.n : chal.def.ammo.reduce((n, a) => n + a[2], 0);
 function useAmmo() {
-  if (!chal) return true;
-  const a = chal.ammo.find(a => a.kind === curProj && a.n > 0); if (!a) return false;
-  a.n--;
-  if (!a.n) { const nx = chal.ammo.find(q => q.n > 0); if (nx) { curProj = nx.kind; curSize = nx.size; } }
+  if (!chal) { if (isLocked(curProj)) { openShop(); return false; } return true; }
+  if (chal.shown) return false;
+  if (chal.pool) { if (chal.pool.n <= 0) return false; chal.pool.n--; }
+  else {
+    const a = chal.ammo.find(a => a.kind === curProj && a.n > 0); if (!a) return false;
+    a.n--;
+    if (!a.n) { const nx = chal.ammo.find(q => q.n > 0); if (nx) { curProj = nx.kind; curSize = nx.size; } }
+  }
+  chal.shots++;
   if (!ammoLeft()) chal.endAt = simTime + 4;
   buildUI(); return true;
 }
 function checkLevelEnd() {
-  if (!chal || chal.endAt == null || chal.shown) return;
-  const busy = P.activeCount > 40 || meteorQueue.length || fields.length || objs.some(o => o.type === 'proj' && !o.gone && (o.bomb || o.hole) && !o.fuseDone && simTime - o.born < 4.5);
+  if (!chal || chal.shown) return;
+  checkBlorbs();
+  const goal = chal.def.goal;
+  if (goal === 'blorb' && chal.blorbs.every(b => b.popped)) { if (chal.winAt == null) chal.winAt = simTime + 1.4; if (simTime >= chal.winAt) return finishChallenge(); return; }
+  if (chal.endAt == null) return;
+  const busy = P.activeCount > 40 || meteorQueue.length || fields.length || objs.some(o => o.type === 'proj' && !o.gone && (o.bomb || o.hole) && simTime - o.born < 4.5);
   if (simTime < chal.endAt || (busy && simTime < chal.endAt + 8)) return;
-  chal.shown = true; updateHud();
-  const L = LEVELS[chal.lv], pct = chal.pct, stars = L.stars.filter(s => pct >= s).length;
-  const st = loadStars(); if (stars > (st[chal.lv] || 0)) { st[chal.lv] = stars; saveStars(st); }
-  $('rTitle').textContent = `Level ${chal.lv + 1} · ${L.name}`;
-  $('rStars').innerHTML = [0, 1, 2].map(k => `<span class="${k < stars ? 'on' : ''}" style="animation-delay:${k * .25}s">★</span>`).join('');
-  $('rPct').textContent = `${pct}% toppled`;
-  $('rMsg').textContent = stars === 3 ? 'Perfect demolition!' : stars ? `Next star at ${L.stars[stars]}%` : `Need ${L.stars[0]}% for a star`;
-  $('rNext').style.display = stars && chal.lv < LEVELS.length - 1 ? '' : 'none';
-  $('result').classList.add('open'); if (stars) snd.ding();
+  finishChallenge();
 }
-$('rRetry').onclick = () => startLevel(chal.lv);
-$('rNext').onclick = () => startLevel(chal.lv + 1);
-$('rLevels').onclick = () => { $('result').classList.remove('open'); openLevels(); };
+function finishChallenge() {
+  chal.shown = true; updateHud();
+  const d = chal.def, left = ammoLeft(), total = ammoTotal();
+  let stars, win, line;
+  if (d.goal === 'blorb') {
+    const alive = chal.blorbs.filter(b => !b.popped).length; win = !alive;
+    stars = win ? (left >= Math.max(2, Math.ceil(total * .4)) ? 3 : left >= 1 ? 2 : 1) : 0;
+    line = win ? 'All Blorbs popped!' : `${alive} Blorb${alive > 1 ? 's' : ''} survived`;
+  } else {
+    stars = d.stars.filter(s => chal.pct >= s).length; win = stars > 0; line = `${chal.pct}% toppled`;
+  }
+  const res = { stars, win, pct: chal.pct, left, shots: chal.shots };
+  const out = d.onResult ? d.onResult(res) || {} : {};
+  $('rTitle').textContent = d.title;
+  $('rStars').innerHTML = [0, 1, 2].map(k => `<span class="${k < stars ? 'on' : ''}" style="animation-delay:${k * .25}s">★</span>`).join('');
+  $('rPct').textContent = line;
+  $('rMsg').textContent = out.msg || (stars === 3 ? 'Perfect!' : win ? 'Nice — go for 3 stars?' : 'So close — try again!');
+  $('rNext').style.display = out.next ? '' : 'none'; $('rNext').onclick = () => out.next && startChallenge(out.next);
+  $('rRetry').onclick = () => startChallenge(d);
+  $('rLevels').onclick = () => { $('result').classList.remove('open'); out.back ? out.back() : openLevels(); };
+  const ex = $('rExtra'); ex.style.display = out.extra ? '' : 'none';
+  if (out.extra) { ex.textContent = out.extra.label; ex.onclick = out.extra.onclick; }
+  $('result').classList.add('open'); if (win) snd.ding();
+}
 function exitChallenge() { if (!chal) return; chal = null; $('result').classList.remove('open'); toast('Left challenge — free play'); }
+function challengeHud() {
+  const d = chal.def, shots = ammoLeft();
+  if (d.goal === 'blorb') return `${d.short || ''} 🟢 ${chal.blorbs.filter(b => !b.popped).length} left · 🎯 ${shots}`;
+  return `${d.short || ''} 💥 ${chal.pct}% · 🎯 ${shots} · ★${d.stars.join(' ★')}`;
+}
+
+// ---- demolition levels (the original 10) ----
+const loadStars = () => { try { return JSON.parse(localStorage.getItem('ts_stars') || '{}'); } catch (e) { return {}; } };
+const saveStars = s => { try { localStorage.setItem('ts_stars', JSON.stringify(s)); } catch (e) {} };
+function demoDef(i) {
+  const L = LEVELS[i];
+  return { title: `Demolition ${i + 1} · ${L.name}`, short: `D${i + 1}`, goal: 'pct', stars: L.stars, ammo: L.ammo,
+    setup: () => loadPreset(PRESETS.find(p => p.id === L.preset)),
+    onResult: r => { const st = loadStars(), prev = st[i] || 0; if (r.stars > prev) { st[i] = r.stars; saveStars(st); addCoins((r.stars - prev) * 30, true); }
+      return { next: r.stars && i < LEVELS.length - 1 ? demoDef(i + 1) : null, msg: r.stars < 3 ? (r.stars ? `Next star at ${L.stars[r.stars]}%` : `Need ${L.stars[0]}% for a star`) : 'Perfect demolition!' }; } };
+}
+const startLevel = i => startChallenge(demoDef(i));
+
+// ---- campaign: 50 generated levels ----
+const TIER_MATS = [['wood', 'glass'], ['wood', 'stone', 'striped'], ['stone', 'concrete', 'checker'], ['concrete', 'marble', 'stone', 'checker'], ['stone', 'concrete', 'marble', 'gold']];
+const TIER_AMMO = [[['ball', 1, 2], ['bowling', 1, 1]], [['bowling', 1, 2], ['cannon', 1, 1]], [['cannon', 1, 2], ['bomb', 1, 1]], [['bomb', 1, 2], ['anvil', 2, 1], ['rocket', 1, 1]], [['bomb', 2, 2], ['cluster', 1, 1], ['rocket', 1, 1]]];
+function cfg(o) { return Object.assign(cbDefault(), { windows: 0, roof: false, floors: 0 }, o); }
+function campaignLayout(n) {
+  const R = rng(n * 977 + 13), T = Math.min(4, Math.floor(n / 10)), pick = a => a[Math.floor(R() * a.length)], mat = () => pick(TIER_MATS[T]);
+  const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+  const cfgs = [], raw = [];
+  const type = n % 10 === 9 ? 'boss' : ['hut', 'tower', 'twins', 'pyramid', 'fort', 'columns', 'glass', 'bunker'][n % 8];
+  if (type === 'hut') cfgs.push(cfg({ shape: 'hollow', w: ri(3, 5), l: ri(3, 5), h: ri(3, 4) + T, mat: mat(), floors: 2, roof: R() < .6, windows: 3 }));
+  if (type === 'tower') cfgs.push(cfg({ shape: R() < .5 ? 'hollow' : 'round', w: ri(4, 5), l: ri(4, 5), h: 6 + 2 * T + ri(0, 4), mat: mat(), floors: 3, roof: true, windows: 3 }));
+  if (type === 'twins') { const h = 5 + 2 * T + ri(0, 2); for (const s of [-3, 3]) cfgs.push(cfg({ shape: 'hollow', w: 3, l: 3, h, mat: mat(), floors: 3, x: s })); raw.push({ spec: Bx('wood', 9, .4, 3), x: 0, y: h * LAY, z: 0 }); }
+  if (type === 'pyramid') cfgs.push(cfg({ shape: 'pyramid', w: 5 + 2 * T, l: 5 + 2 * T, h: 60, mat: T > 1 ? 'sand' : mat() }));
+  if (type === 'fort') { const s = 3 + T, h = 2 + Math.ceil(T / 2) + 1;
+    cfgs.push(cfg({ shape: 'wall', w: 2 * s - 1, l: 1, h, mat: mat(), z: -s, crenels: true }), cfg({ shape: 'wall', w: 2 * s - 1, l: 1, h, mat: mat(), z: s, crenels: true }),
+      cfg({ shape: 'wall', w: 1, l: 2 * s - 3, h, mat: mat(), x: -s + 1 }), cfg({ shape: 'wall', w: 1, l: 2 * s - 3, h, mat: mat(), x: s - 1 })); }
+  if (type === 'columns') { const k = 3 + Math.min(2, T), h = 3 + T + ri(0, 2), m = mat();
+    for (let i = 0; i < k; i++) { const x = (i - (k - 1) / 2) * 3; for (const dz of [-1, 1]) cfgs.push(cfg({ shape: 'solid', w: 1, l: 1, h, mat: m, x, z: dz }));
+      raw.push({ spec: Bx('wood', 1.6, .4, 3.2), x, y: h * LAY, z: 0 }); } }
+  if (type === 'glass') cfgs.push(cfg({ shape: 'hollow', w: 4, l: 4, h: 8 + 2 * T, mat: 'glass', floors: 2, roof: true }));
+  if (type === 'bunker') { const w = 6, h = 3 + T; cfgs.push(cfg({ shape: 'hollow', w, l: w, h, thick: 2, mat: T > 1 ? 'concrete' : 'stone' })); raw.push({ spec: Bx('concrete', w + .2, .4, w + .2), x: 0, y: h * LAY, z: 0 }); }
+  if (type === 'boss') { const s = 6 + T;
+    for (const [x, z] of [[-s, -s], [s, -s], [-s, s], [s, s]]) cfgs.push(cfg({ shape: 'round', w: 4, l: 4, h: 7 + 2 * T, mat: mat(), x, z, floors: 3, roof: true, windows: 3 }));
+    cfgs.push(cfg({ shape: 'hollow', w: 6, l: 6, h: 9 + 2 * T, mat: mat(), floors: 3, roof: true, windows: 3, tnt: true }));
+    for (const z of [-s, s]) cfgs.push(cfg({ shape: 'wall', w: 2 * s - 5, l: 1, h: 3 + T, mat: mat(), z, crenels: true })); }
+  const nBlorbs = Math.min(6, 1 + Math.floor(n / 9) + (type === 'boss' ? 2 : 0));
+  let ammo = TIER_AMMO[T].map(a => a.slice());
+  if (type === 'boss') ammo.push(n === 49 ? ['nuke', 1, 1] : n >= 29 ? ['hole', 1, 1] : ['cluster', 1, 1]);
+  return { cfgs, raw, nBlorbs, ammo, type, R };
+}
+function blorbSpots(pieces, k, R) {
+  const boxes = pieces.map(p => pieceAABB(p)), cands = [];
+  const free = (x, y, z) => !boxes.some(b => b.lowerBound.x < x + .32 && b.upperBound.x > x - .32 && b.lowerBound.z < z + .32 && b.upperBound.z > z - .32 && b.upperBound.y > y + .02 && b.lowerBound.y < y + .75);
+  const cover = (x, y, z) => boxes.filter(b => b.lowerBound.x < x + .3 && b.upperBound.x > x - .3 && b.lowerBound.z < z + .3 && b.upperBound.z > z - .3 && b.lowerBound.y >= y + .7).length;
+  pieces.forEach((p, i) => {
+    if (p.spec.shape !== 'box') return; const b = boxes[i], top = b.upperBound.y;
+    const wx = b.upperBound.x - b.lowerBound.x, wz = b.upperBound.z - b.lowerBound.z; if (wx < .8 || wz < .8) return;
+    for (let x = b.lowerBound.x + .5; x <= b.upperBound.x - .45; x += 1) for (let z = b.lowerBound.z + .5; z <= b.upperBound.z - .45; z += 1) if (free(x, top, z)) cands.push([x, top, z]);
+  });
+  if (boxes.length) {   // ground spots inside the structure's footprint
+    const x0 = Math.min(...boxes.map(b => b.lowerBound.x)), x1 = Math.max(...boxes.map(b => b.upperBound.x)), z0 = Math.min(...boxes.map(b => b.lowerBound.z)), z1 = Math.max(...boxes.map(b => b.upperBound.z));
+    for (let x = Math.ceil(x0) + .5; x < x1 - .4; x += 1) for (let z = Math.ceil(z0) + .5; z < z1 - .4; z += 1) if (free(x, 0, z)) cands.push([x, 0, z]);
+  }
+  const scored = cands.map(c => ({ c, s: cover(...c) * 1.5 + c[1] * .15 + R() * 2 })).sort((a, b) => b.s - a.s), out = [];
+  for (const { c } of scored) { if (out.length >= k) break; if (out.every(o => Math.hypot(o[0] - c[0], o[2] - c[2]) > 1.3 || Math.abs(o[1] - c[1]) > 1.5)) out.push(c); }
+  return out;
+}
+function placeLayout(L) {
+  const pieces = L.cfgs.flatMap(genStructure).concat(L.raw);
+  let ext = 6, top = 0;
+  for (const p of pieces) { ext = Math.max(ext, Math.abs(p.x) + 1.5, Math.abs(p.z) + 1.5); top = Math.max(top, p.y + specHeight(p.spec)); }
+  setArena(clamp(Math.ceil(ext + 1), 10, 34));
+  for (const p of pieces) put(p.spec, p.x, p.y, p.z, p.rot);
+  for (const s of blorbSpots(pieces, L.nBlorbs, L.R)) spawnBlorb(...s);
+  cam.tR = clamp(Math.max(ext * 2.6, top * 2, 18), 14, 70); cam.target.y = clamp(top * .3, 1.5, 9); cam.tEl = .4;
+}
+function campaignDef(n) {
+  const L = campaignLayout(n);
+  return { title: `Level ${n + 1}${L.type === 'boss' ? ' · BOSS' : ''}`, short: `L${n + 1}`, goal: 'blorb', ammo: L.ammo, setup: () => placeLayout(campaignLayout(n)),
+    onResult: r => { const prev = SAVE.camp[n] || 0; if (r.stars > prev) { SAVE.camp[n] = r.stars; persist(); addCoins((r.stars - prev) * 20 + (prev ? 0 : 15), true); }
+      return { next: r.win && n < 49 ? campaignDef(n + 1) : null, msg: r.win ? (r.stars < 3 ? 'Win with more shots left for 3 ★' : 'Flawless!') : 'Blorbs survived — try another angle' }; } };
+}
+
+// ---- daily challenge ----
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function dailyDef() {
+  const key = todayKey(), seed = [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
+  return { title: `Daily · ${key}`, short: '📅', goal: 'pct', stars: [30, 55, 80], ammo: [['bomb', 1, 1], ['cannon', 2, 1], ['rocket', 1, 1]],
+    setup: () => { const R = rng(seed), lay = { cfgs: [], raw: [], nBlorbs: 0, R }, spots = [[-6, -6], [0, -6], [6, -6], [-6, 0], [6, 0], [-6, 6], [0, 6], [6, 6], [0, 0]];
+      for (const [x, z] of spots) { const t = Math.floor(R() * 4), m = ['stone', 'wood', 'glass', 'concrete', 'striped', 'checker'][Math.floor(R() * 6)];
+        if (t === 0) lay.cfgs.push(cfg({ shape: 'hollow', w: 3, l: 3, h: 4 + Math.floor(R() * 10), mat: m, floors: 3, roof: R() < .5, x, z }));
+        if (t === 1) lay.cfgs.push(cfg({ shape: 'round', w: 4, l: 4, h: 4 + Math.floor(R() * 8), mat: m, x, z, roof: true }));
+        if (t === 2) lay.cfgs.push(cfg({ shape: 'pyramid', w: 4, l: 4, h: 60, mat: m, x, z }));
+        if (t === 3) lay.cfgs.push(cfg({ shape: 'solid', w: 2, l: 2, h: 3 + Math.floor(R() * 9), mat: m, x, z, windows: 2 })); }
+      placeLayout(lay); },
+    onResult: r => {
+      const d = SAVE.daily, first = d.date !== key;
+      if (first) { const y = new Date(); y.setDate(y.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+        d.streak = d.date === yk ? (d.streak || 0) + 1 : 1; d.date = key; d.best = 0; addCoins(40 + 10 * Math.min(d.streak, 7), true); }
+      const better = r.pct > (d.best || 0); if (better) d.best = r.pct; persist();
+      return { msg: `${better ? 'New best!' : `Today's best: ${d.best}%`} · 🔥 ${d.streak}-day streak`,
+        extra: { label: '📋 Copy score', onclick: () => copyText(`💥 Tower Smash daily ${key}: I toppled ${r.pct}% in 3 shots (🔥${d.streak} day streak). ${PAGES_URL}`) } };
+    } };
+}
+
+// ---- levels sheet with tabs ----
+let levelsTab = 'camp';
+function openLevels(tab) {
+  if (tab) levelsTab = tab;
+  for (const t of ['camp', 'demo', 'daily']) $('tab_' + t).classList.toggle('on', t === levelsTab);
+  const g = $('lgrid'); g.innerHTML = ''; g.className = levelsTab === 'camp' ? 'camp' : '';
+  if (levelsTab === 'camp') {
+    const tot = Object.values(SAVE.camp).reduce((a, b) => a + b, 0);
+    g.insertAdjacentHTML('beforeend', `<div class="sect">Pop every Blorb 🟢 · ${tot} / 150 ★</div>`);
+    for (let n = 0; n < 50; n++) {
+      const st = SAVE.camp[n] || 0, locked = n > 0 && !(SAVE.camp[n - 1] > 0), boss = n % 10 === 9;
+      const b = document.createElement('button'); b.className = 'lvlc' + (locked ? ' locked' : '') + (boss ? ' boss' : '') + (st ? ' done' : '');
+      b.innerHTML = `<b>${locked ? '🔒' : boss ? '👑' : n + 1}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i>`;
+      b.onclick = () => locked ? toast('Beat the previous level first') : startChallenge(campaignDef(n));
+      g.appendChild(b);
+    }
+  } else if (levelsTab === 'demo') {
+    const st = loadStars();
+    LEVELS.forEach((L, i) => {
+      const best = st[i] || 0, locked = i > 0 && !(st[i - 1] > 0);
+      const b = document.createElement('button'); b.className = 'card lvl' + (locked ? ' locked' : '');
+      const ammo = L.ammo.map(([k, s, n]) => `${n}× ${['S', 'M', 'L', 'XL'][s]} ${PROJ[k].label}`).join(' + ');
+      b.innerHTML = `<span class="em">${locked ? '🔒' : i + 1}</span><b>${L.name}</b><small>${ammo}</small><i>${'★'.repeat(best)}${'☆'.repeat(3 - best)}</i>`;
+      b.onclick = () => locked ? toast('Get ★ on the previous level first') : startLevel(i);
+      g.appendChild(b);
+    });
+  } else {
+    const d = SAVE.daily, done = d.date === todayKey();
+    g.insertAdjacentHTML('beforeend', `<div class="daily"><div class="em">📅</div><b>Daily Demolition</b><p>A new city every day. 3 shots — topple as much as you can.</p>
+      <p>🔥 Streak: <b>${d.streak || 0}</b> day${d.streak === 1 ? '' : 's'} · Today's best: <b>${done ? d.best + '%' : '—'}</b></p><p class="small">First play each day: +40 🪙 plus a streak bonus</p></div>`);
+    const b = document.createElement('button'); b.className = 'b1 wide'; b.textContent = done ? 'Play again' : 'Play today\'s challenge'; b.onclick = () => startChallenge(dailyDef()); g.appendChild(b);
+  }
+  $('levels').classList.add('open');
+}
+for (const t of ['camp', 'demo', 'daily']) $('tab_' + t).onclick = () => openLevels(t);
+$('levelsX').onclick = () => $('levels').classList.remove('open');
+$('levels').addEventListener('click', e => { if (e.target.id === 'levels') $('levels').classList.remove('open'); });
+
+// ---- Build vs Smash duels: the fortress travels inside a share code / link ----
+const PAGES_URL = 'https://alecsras.github.io/tower-smash-3d/';
+let duelBuild = null;   // {budget, name} while you're building a fortress for a friend
+const duelCost = o => o.mat === 'tnt' ? 5 : 1;
+const duelUsed = () => objs.filter(o => !o.gone && o.type === 'block').reduce((n, o) => n + duelCost(o), 0);
+function b64u(bytes) { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function unb64u(str) { const s = atob(str.replace(/-/g, '+').replace(/_/g, '/')); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+async function packJSON(obj) {
+  const raw = new TextEncoder().encode(JSON.stringify(obj));
+  if (window.CompressionStream) { const c = await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer(); return 'TS1z' + b64u(new Uint8Array(c)); }
+  return 'TS1j' + b64u(raw);
+}
+async function unpackJSON(code) {
+  code = code.trim(); const m = code.match(/TS1[zj][A-Za-z0-9_-]+/); if (!m) throw new Error('No challenge code found');
+  const body = unb64u(m[0].slice(4));
+  const bytes = m[0][3] === 'z' ? new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()) : body;
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+async function encodeFortress(extra = {}) {
+  const pal = [], key = s => { const k = s.mat + '|' + s.shape + '|' + s.d.map(v => +v.toFixed(3)).join(','); let i = pal.findIndex(p => p.k === k); if (i < 0) { pal.push({ k, s }); i = pal.length - 1; } return i; };
+  const pieces = [];
+  for (const o of objs) {
+    if (o.gone || o.type !== 'block') continue;
+    const p = o.body.position, q = o.body.quaternion, yaw = Math.round(2 * Math.atan2(q.y, q.w) * 180 / Math.PI) % 360;
+    pieces.push([key(o.spec), Math.round(p.x * 100), Math.round((p.y - specHeight(o.spec) / 2) * 100), Math.round(p.z * 100), yaw]);
+  }
+  return packJSON({ v: 1, n: (duelBuild && duelBuild.name) || 'A friend', pal: pal.map(p => [p.s.mat, p.s.shape, p.s.d]), p: pieces, ...extra });
+}
+function duelDef(F) {
+  const pal = F.pal.map(([mat, shape, d]) => ({ mat, shape, d }));
+  const beat = F.best ? ` (${F.bestBy || 'someone'} got ${F.best}%)` : '';
+  return { title: `⚔️ ${F.n}'s fortress${beat}`, short: '⚔️', goal: 'pct', stars: [25, 50, 75], pool: { n: F.s || 3 },
+    setup: () => {
+      let ext = 6, top = 0;
+      for (const [i, x, y, z] of F.p) { ext = Math.max(ext, Math.abs(x / 100) + 1.5, Math.abs(z / 100) + 1.5); top = Math.max(top, y / 100 + specHeight(pal[i])); }
+      setArena(clamp(Math.ceil(ext + 1), 10, 34));
+      for (const [i, x, y, z, yaw] of F.p) put(pal[i], x / 100, y / 100, z / 100, yaw * Math.PI / 180);
+      cam.tR = clamp(Math.max(ext * 2.6, top * 2, 18), 14, 70); cam.target.y = clamp(top * .3, 1.5, 9); cam.tEl = .4;
+    },
+    onResult: r => ({ msg: F.best ? (r.pct > F.best ? `You beat ${F.bestBy || 'them'}! 🏆` : `${F.bestBy || 'They'} still lead with ${F.best}%`) : 'Send it back and dare them to build better!',
+      extra: { label: '📤 Send result', onclick: async () => {
+        const who = (SAVE.name || 'Someone').slice(0, 16);
+        const code = await packJSON({ ...F, best: Math.max(r.pct, F.best || 0), bestBy: r.pct >= (F.best || 0) ? who : F.bestBy });
+        showShare(`💥 I smashed ${r.pct}% of ${F.n}'s fortress in ${F.s || 3} shots! Think you can beat it?`, code);
+      } } })
+  };
+}
+function copyText(t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied!'), () => { $('shareCode').value = t; $('shareCode').select(); toast('Select & copy the text'); }); }
+function showShare(text, code) {
+  const link = PAGES_URL + '#duel=' + code;
+  $('shareText').textContent = text; $('shareCode').value = code; $('shareLink').value = link;
+  $('shareCopyAll').onclick = () => copyText(`${text}\n${link}`);
+  $('shareCopyCode').onclick = () => copyText(code);
+  $('shareNative').style.display = navigator.share && !inFrame ? '' : 'none';
+  $('shareNative').onclick = () => navigator.share({ title: 'Tower Smash', text, url: link }).catch(() => {});
+  $('result').classList.remove('open'); $('duel').classList.add('open'); $('duelPanes').dataset.pane = 'share';
+}
+const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+function openDuel() {
+  $('duelPanes').dataset.pane = duelBuild ? 'building' : 'home';
+  if (duelBuild) $('duelBudgetTxt').textContent = `${duelUsed()} / ${duelBuild.budget} blocks used`;
+  $('duel').classList.add('open');
+}
+let duelBudget = 400;
+$('duelName').value = SAVE.name || ''; $('duelName').onchange = e => { SAVE.name = e.target.value.trim().slice(0, 16); persist(); };
+document.querySelectorAll('#duelBudgets button').forEach(b => b.onclick = () => { duelBudget = +b.dataset.v; document.querySelectorAll('#duelBudgets button').forEach(c => c.classList.toggle('on', c === b)); });
+$('duelFresh').onclick = () => { duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; clearAll(); snapshot = null; dirty = true; setArena(10); $('duel').classList.remove('open'); setMode('build'); toast(`⚔️ Build your fortress — ${duelBudget} block budget`); updateHud(); };
+$('duelUse').onclick = () => { duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; $('duel').classList.remove('open'); setMode('build'); updateHud(); toast('⚔️ Fortress mode on — tap ⚔️ when ready to send'); };
+$('duelSend').onclick = async () => {
+  const used = duelUsed();
+  if (!used) { toast('Build something first!'); return; }
+  if (used > duelBuild.budget) { toast(`Over budget by ${used - duelBuild.budget} — remove some blocks (TNT costs 5)`); return; }
+  const code = await encodeFortress({ s: 3 });
+  showShare(`⚔️ ${duelBuild.name} built a ${used}-block fortress. Can you smash it in 3 shots?`, code);
+};
+$('duelCancel').onclick = () => { duelBuild = null; $('duel').classList.remove('open'); updateHud(); toast('Fortress mode off'); };
+$('duelPlay').onclick = async () => {
+  try { const F = await unpackJSON($('duelPaste').value); $('duel').classList.remove('open'); duelBuild = null; startChallenge(duelDef(F)); }
+  catch (e) { toast('That code didn’t work — paste the whole message'); }
+};
+$('duelX').onclick = () => $('duel').classList.remove('open');
+$('duel').addEventListener('click', e => { if (e.target.id === 'duel') $('duel').classList.remove('open'); });
+$('duelBtn').onclick = openDuel;
+async function checkIncomingDuel() {
+  const h = location.hash + location.search, m = h.match(/duel=(TS1[zj][A-Za-z0-9_-]+)/);
+  if (!m) return;
+  try { const F = await unpackJSON(m[1]); history.replaceState(null, '', location.pathname); startChallenge(duelDef(F)); } catch (e) { toast('Could not open that challenge link'); }
+}
+
+// ================= fracture, fire, replay, glow =================
+// ---- fracture: hard hits split boxes into real physical chunks ----
+const FRACT = { wood: 13, stone: 17, concrete: 16, marble: 15, sand: 11, lacquer: 12, roof: 11, gold: 24 };
+const MAT_DUST = { wood: [.62, .42, .22], stone: [.6, .62, .65], concrete: [.72, .72, .72], marble: [.9, .88, .84], sand: [.85, .72, .48], lacquer: [.6, .18, .12], roof: [.7, .3, .2], gold: [1, .8, .3] };
+let pendingFracture = new Set();
+const canFracture = o => o.type === 'block' && !o.gone && o.spec && o.spec.shape === 'box' && FRACT[o.mat] && specVolume(o.spec) > .2;
+function splitBox(size, off, depth, maxDepth) {
+  if (depth >= maxDepth || size[0] * size[1] * size[2] < .14) return [[size, off]];
+  const ax = size.indexOf(Math.max(...size)), r = rand(.38, .62);
+  const a = size.slice(), b = size.slice(); a[ax] = size[ax] * r; b[ax] = size[ax] * (1 - r);
+  const oa = off.slice(), ob = off.slice(); oa[ax] -= size[ax] / 2 - a[ax] / 2; ob[ax] += size[ax] / 2 - b[ax] / 2;
+  return [...splitBox(a, oa, depth + 1, maxDepth), ...splitBox(b, ob, depth + 1, maxDepth)];
+}
+function fracture(o) {
+  if (!canFracture(o) || objs.length > 15000) return;
+  const vol = specVolume(o.spec), parts = splitBox(o.spec.d.slice(), [0, 0, 0], 0, vol > 1.5 ? 3 : 2);
+  const p = o.body.position.clone(), q = o.body.quaternion.clone(), v = o.body.velocity.clone(), { tint, charred, mat } = o;
+  removeObj(o);
+  for (const [sz, off] of parts) {
+    const s = sz.map(x => x * .97), wo = q.vmult(new V3(off[0], off[1], off[2])), ol = Math.hypot(wo.x, wo.y, wo.z) || 1, kick = rand(.8, 2.4);
+    const body = new P.PBody({ shape: { kind: 'box', hx: s[0] / 2, hy: s[1] / 2, hz: s[2] / 2 }, density: DENS[mat], pos: new V3(p.x + wo.x, p.y + wo.y, p.z + wo.z), quat: q.clone() });
+    body.velocity.set(v.x + wo.x / ol * kick, v.y + wo.y / ol * kick + .5, v.z + wo.z / ol * kick);
+    body.angularVelocity.set(rand(-3, 3), rand(-3, 3), rand(-3, 3));
+    const spec = Bx(mat, s[0], s[1], s[2]);
+    addObj({ body, spec, sc: spec.d, type: 'block', mat, chunk: true, tint, charred, cdirty: !!tint });
+  }
+  const c = MAT_DUST[mat] || [.6, .6, .6];
+  for (let i = 0; i < 10; i++) spawnP(p.x, p.y, p.z, rand(-2.5, 2.5), rand(0, 3), rand(-2.5, 2.5), rand(.5, 1.1), c, rand(.2, .45), -3, 1.5, .8);
+  if (Math.random() < .5) snd.crack();
+}
+function processFractures() {
+  let n = 0;
+  for (const o of pendingFracture) { pendingFracture.delete(o); fracture(o); if (++n >= 24) break; }
+}
+
+// ---- fire: wood ignites, burns, spreads, chars, crumbles ----
+const IGNITE = { wood: 1, lacquer: 1, roof: .25, domino: .6 };
+let burning = new Set(), nextSpread = 0, nextCrackle = 0;
+function ignite(o, chance = 1) {
+  if (o.gone || o.burn || o.charred || !IGNITE[o.mat] || o.type !== 'block' || burning.size > 280 || Math.random() > chance * IGNITE[o.mat]) return;
+  o.burn = { t0: simTime, dur: rand(6, 9.5) }; burning.add(o);
+}
+function igniteNear(c, R, chance) {
+  const a = { lowerBound: { x: c.x - R, y: c.y - R, z: c.z - R }, upperBound: { x: c.x + R, y: c.y + R, z: c.z + R } };
+  const near = new Set();
+  forCells(a, 0, k => { const st = dormant.get(k); if (st) for (const o of st) near.add(o); });
+  for (const pb of P.bodies()) if (pb.userData) near.add(pb.userData);
+  for (const o of near) if (o.body.position.distanceTo(c) < R) ignite(o, chance);
+}
+function updateFire() {
+  if (!burning.size) return;
+  const stride = Math.max(1, Math.ceil(burning.size / 45)); let i = 0;
+  for (const o of burning) {
+    if (o.gone) { burning.delete(o); continue; }
+    const k = (simTime - o.burn.t0) / o.burn.dur, glow = .5 + .5 * Math.sin(simTime * 13 + (o.bi || 0));
+    o.tint = [1, Math.max(.2, .5 + .22 * glow - .35 * k), Math.max(.05, .22 * (1 - k))]; o.cdirty = true;
+    if (i++ % stride === 0) {
+      const p = o.body.position, h = specHeight(o.spec) / 2;
+      spawnP(p.x + rand(-.35, .35), p.y + h, p.z + rand(-.35, .35), rand(-.3, .3), rand(1.6, 3.2), rand(-.3, .3), rand(.35, .7), [1, rand(.35, .7), .08], rand(.28, .5), 1.5, -.4, .95);
+      if (Math.random() < .3) spawnP(p.x, p.y + h + .6, p.z, rand(-.4, .4), rand(1, 2), rand(-.4, .4), rand(1.4, 2.4), [.18, .17, .17], rand(.5, .8), .5, 2, .45);
+    }
+    if (k >= 1) {
+      burning.delete(o); o.burn = null; o.charred = true; o.tint = [.22, .19, .17]; o.cdirty = true;
+      if (Math.random() < .5) { activate(o); pendingFracture.add(o); }
+    }
+  }
+  if (simTime > nextSpread) {
+    nextSpread = simTime + .6;
+    for (const o of [...burning]) { const k = (simTime - o.burn.t0) / o.burn.dur; if (k > .15 && k < .9) igniteNear(o.body.position, 1.35, .3); }
+  }
+  if (simTime > nextCrackle) { nextCrackle = simTime + rand(.15, .45); snd.crackle(Math.min(1, burning.size / 40)); }
+}
+
+// ---- instant replay: records the last ~7 s of motion and plays it back cinematically ----
+const REC_WIN = 7;
+const rec = { frames: [], starts: [], removes: [], fx: [], fno: 0, on: true };
+function recordFrame() {
+  if (!rec.on || replay) return;
+  rec.fno++;
+  if (rec.fno % 2) return;                                       // ~30 fps
+  const list = [];
+  for (const o of objs) if (!o.gone && (o.mdirty || (o.mesh && !o.body.isSleeping()))) list.push(o);
+  if (list.length) {
+    const data = new Float32Array(list.length * 7);
+    list.forEach((o, i) => {
+      if (o.lastRecF !== rec.fno - 2) rec.starts.push({ t: simTime, o, pose: o.lastPose || null });
+      const p = o.body.position, q = o.body.quaternion, j = i * 7;
+      data[j] = p.x; data[j + 1] = p.y; data[j + 2] = p.z; data[j + 3] = q.x; data[j + 4] = q.y; data[j + 5] = q.z; data[j + 6] = q.w;
+      o.lastRecF = rec.fno; o.lastPose = data.subarray(j, j + 7);
+    });
+    rec.frames.push({ t: simTime, list, data });
+  }
+  const cut = simTime - REC_WIN;
+  while (rec.frames.length && rec.frames[0].t < cut) rec.frames.shift();
+  for (const k of ['starts', 'removes', 'fx']) while (rec[k].length && rec[k][0].t < cut) rec[k].shift();
+  $('replayBtn').classList.toggle('show', mode === 'throw' && rec.frames.length > 20 && !replay);
+}
+const recRemove = o => { if (rec.on && !replay) rec.removes.push({ t: simTime, o }); };
+const recFx = (c, power) => { if (rec.on && !replay) rec.fx.push({ t: simTime, c: c.clone(), power }); };
+
+let replay = null;
+function startReplay(withClip) {
+  if (!rec.frames.length || replay) return;
+  const T0 = rec.frames[0].t, T1 = rec.frames[rec.frames.length - 1].t;
+  const tl = new Map();                                           // o -> {t:[], p:[]}
+  for (const f of rec.frames) f.list.forEach((o, i) => { let e = tl.get(o); if (!e) tl.set(o, e = { t: [], p: [], init: null, rem: Infinity, born: -Infinity }); e.t.push(f.t); e.p.push(f.data.subarray(i * 7, i * 7 + 7)); });
+  for (const s of rec.starts) { const e = tl.get(s.o); if (e && e.init == null && s.pose) e.init = s.pose; }
+  for (const r of rec.removes) { const e = tl.get(r.o); if (e) e.rem = r.t; }
+  for (const [o, e] of tl) if (o.createdT != null && o.createdT > T0) e.born = o.createdT;
+  // ghosts: removed batch objects get a temporary instanced mesh so they reappear during the replay
+  const ghosts = new Map();
+  for (const [o, e] of tl) if (o.gone && !o.mesh && o.spec) {
+    const b = batchFor(o.spec); let g = ghosts.get(b);
+    if (!g) ghosts.set(b, g = { b, items: [] }); g.items.push(o);
+  }
+  for (const g of ghosts.values()) {
+    g.mesh = new THREE.InstancedMesh(g.b.geo, g.b.mat, g.items.length); g.mesh.frustumCulled = false; g.mesh.castShadow = g.b.cast;
+    g.items.forEach((o, i) => o.gi = i); scene.add(g.mesh);
+  }
+  for (const [o] of tl) if (o.mesh && o.gone) scene.add(o.mesh);
+  // camera: orbit the action
+  let cx = 0, cy = 0, cz = 0, n = 0;
+  for (const f of rec.fx) { cx += f.c.x * 5; cy += f.c.y * 5; cz += f.c.z * 5; n += 5; }
+  for (const [, e] of tl) { const p = e.p[Math.floor(e.p.length / 2)]; cx += p[0]; cy += p[1]; cz += p[2]; n++; }
+  cx /= n; cy /= n; cz /= n;
+  let spread = 0; for (const [, e] of tl) { const p = e.p[e.p.length - 1]; spread = Math.max(spread, Math.hypot(p[0] - cx, p[2] - cz)); }
+  replay = { T0, T1, t: T0, tl, ghosts, fxi: 0, fx: rec.fx.slice(), saved: { th: cam.theta, el: cam.el, r: cam.r, tgt: cam.target.clone(), tTh: cam.tTheta, tEl: cam.tEl, tR: cam.tR },
+    center: new THREE.Vector3(cx, Math.max(1.5, cy * .6), cz), R: clamp(spread * 1.6 + 10, 12, 55), th0: cam.theta };
+  document.body.classList.add('replaying'); $('replayBtn').classList.remove('show');
+  parts = [];
+  if (withClip) startClip();
+}
+const _rm = new THREE.Matrix4(), _rp = new THREE.Vector3(), _rq = new THREE.Quaternion(), _rs = new THREE.Vector3();
+function poseAt(e, t) {
+  if (t < e.born || t >= e.rem) return null;
+  let lo = 0, hi = e.t.length - 1;
+  if (t < e.t[0]) return e.init || e.p[0];
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (e.t[m] <= t) lo = m; else hi = m - 1; }
+  return e.p[lo];
+}
+function updateReplay(rawDt) {
+  const R = replay; R.t += rawDt * .55;
+  while (R.fxi < R.fx.length && R.fx[R.fxi].t <= R.t) { const f = R.fx[R.fxi++]; explosionFX(f.c, f.power); }
+  for (const [o, e] of R.tl) {
+    const p = poseAt(e, R.t);
+    if (o.mesh) { o.mesh.visible = !!p; if (p) { o.mesh.position.set(p[0], p[1], p[2]); if (!o.rocket) o.mesh.quaternion.set(p[3], p[4], p[5], p[6]); } continue; }
+    const k = p ? 1 : 0;
+    if (p) { _rp.set(p[0], p[1], p[2]); _rq.set(p[3], p[4], p[5], p[6]); } else _rp.set(0, -999, 0);
+    _rs.set(o.sc[0] * k || 1e-4, o.sc[1] * k || 1e-4, o.sc[2] * k || 1e-4);
+    _rm.compose(_rp, _rq, _rs);
+    if (o.gone) { const g = R.ghosts.get(batchFor(o.spec)); g.mesh.setMatrixAt(o.gi, _rm); g.mesh.instanceMatrix.needsUpdate = true; }
+    else if (o.batch) { o.batch.mesh.setMatrixAt(o.bi, _rm); o.batch.mesh.instanceMatrix.needsUpdate = true; }
+  }
+  const prog = (R.t - R.T0) / Math.max(.1, R.T1 - R.T0);
+  cam.target.copy(R.center); cam.theta = cam.tTheta = R.th0 + .9 + prog * 1.4; cam.el = cam.tEl = .28 + .12 * Math.sin(prog * 3); cam.r = cam.tR = R.R * (1.05 - .25 * prog);
+  $('replayBar').style.width = (prog * 100).toFixed(1) + '%';
+  if (R.t >= R.T1 + .3) stopReplay();
+}
+function stopReplay() {
+  const R = replay; if (!R) return; replay = null;
+  for (const g of R.ghosts.values()) { scene.remove(g.mesh); g.mesh.dispose(); }
+  for (const [o] of R.tl) { if (o.mesh) { if (o.gone) scene.remove(o.mesh); else { o.mesh.visible = true; syncMesh(o); } } else if (!o.gone) o.mdirty = true; }
+  const s = R.saved; cam.theta = s.th; cam.el = s.el; cam.r = s.r; cam.target.copy(s.tgt); cam.tTheta = s.tTh; cam.tEl = s.tEl; cam.tR = s.tR;
+  document.body.classList.remove('replaying'); parts = [];
+  stopClip();
+}
+$('replayBtn').onclick = () => $('replayMenu').classList.toggle('open');
+$('replayPlay').onclick = () => { $('replayMenu').classList.remove('open'); startReplay(false); };
+$('replayClip').onclick = () => { $('replayMenu').classList.remove('open'); startReplay(true); };
+$('replayStop').onclick = e => { e.stopPropagation(); stopReplay(); };
+
+// ---- clip recording (canvas -> video file) ----
+let clipRec = null, clipChunks = [], clipBlob = null, downloadsP = null;
+const clipSupported = () => !!(window.MediaRecorder && renderer.domElement.captureStream);
+function startClip() {
+  if (!clipSupported()) { toast('Clip recording isn’t supported in this browser'); return; }
+  const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'], type = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  try {
+    clipChunks = []; clipRec = new MediaRecorder(renderer.domElement.captureStream(30), type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined);
+    clipRec.ondataavailable = e => e.data.size && clipChunks.push(e.data);
+    clipRec.onstop = () => { clipBlob = new Blob(clipChunks, { type: clipRec.mimeType || 'video/webm' }); $('clipBar').classList.add('open'); };
+    clipRec.start(250);
+  } catch (e) { clipRec = null; toast('Could not start recording'); }
+}
+function stopClip() { if (clipRec && clipRec.state !== 'inactive') clipRec.stop(); }
+$('clipSave').onclick = async () => {
+  if (!clipBlob) return;
+  const ext = clipBlob.type.includes('mp4') ? 'mp4' : 'webm', name = `tower-smash-${Date.now()}.${ext}`;
+  const dl = await (downloadsP || (downloadsP = useCap('downloads')));
+  try {
+    if (dl) { await dl.save({ filename: name, data: clipBlob }); toast('Clip saved'); }
+    else if (navigator.canShare && navigator.canShare({ files: [new File([clipBlob], name, { type: clipBlob.type })] })) await navigator.share({ files: [new File([clipBlob], name, { type: clipBlob.type })], title: 'Tower Smash' });
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(clipBlob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  } catch (e) { toast('Clip not saved'); }
+  $('clipBar').classList.remove('open');
+};
+$('clipX').onclick = () => $('clipBar').classList.remove('open');
+
+// ---- platform capabilities (artifact viewer) ----
+async function useCap(name) {
+  for (let i = 0; i < 40 && !(window.claude && window.claude.use); i++) await new Promise(r => setTimeout(r, 150));
+  try { return window.claude && window.claude.use ? await window.claude.use(name) : null; } catch (e) { return null; }
+}
+
+// ---- glow (bloom) for high quality ----
+let composer = null, bloomPass = null;
+function applyQuality() {
+  const high = SAVE.quality === 'high';
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, high ? 2 : 1.5));
+  sun.shadow.mapSize.set(high ? 2048 : 1024, high ? 2048 : 1024); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  if (high && !composer) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .5, .45, .86); composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+  }
+  resize();
+}
+function renderFrame() {
+  if (composer && SAVE.quality === 'high') { bloomPass.strength = night ? .95 : .5; bloomPass.threshold = night ? .6 : .86; composer.render(); }
+  else renderer.render(scene, camera);
+}
+
+// ================= ✨ describe-it builder =================
+const AI_GUIDE = `You design structures for Tower Smash, a 3D block-physics destruction game. Reply with ONLY a blueprint inside a \`\`\`blueprint code fence: one structure per line in this command language.
+
+GRID: 1 unit = 1 block. Ground is y=0. "at X,Z" = the structure's center (keep X and Z between -20 and 20). "up N" starts it N blocks above the ground so it can sit on something below.
+SHAPES:
+  solid W x L x H   – filled with blocks (each block is separate, so blocks over empty air fall)
+  tower W x L x H   – hollow rectangular walls
+  round W x L x H   – hollow cylinder
+  pyramid W x L     – stepped pyramid
+  wall W x L x H    – a straight wall (use L=1 for a wall running along X, W=1 along Z)
+  stairs W x L x H  – steps rising along +X
+  slab W x L x H    – ONE solid piece (H = 1..3). Use slabs for floors, decks, bridges, roofs and platforms that span gaps.
+MATERIALS: stone wood glass marble concrete sand gold tnt striped checker random
+EXTRAS: windows N · floors N (tower/round only) · thick N · battlements · roof (spire on round/small towers, pitched roof otherwise) · tnt core
+PHYSICS RULES (important — the build is simulated and will collapse if unsupported):
+  • Structures must not overlap: something W wide at X spans X-W/2 … X+W/2.
+  • Anything with "up N" must rest exactly on the top of a structure that is N tall where they meet.
+  • A hollow tower/round can only support something with the SAME W and L on top — otherwise put a slab of the same footprint on it first, then build on the slab.
+  • Bridges/decks across gaps must be slabs whose ends rest on supports.
+  • Keep the total under 6000 blocks (solid W·L·H; tower ≈ 2·(W+L)·H). Max 40 x 40 x 60. Aim for a recognizable silhouette in 4–20 lines.
+EXAMPLE — a lighthouse:
+\`\`\`blueprint
+solid 6x6x4 stone
+round 4x4x14 striped windows 3 floors 4 up 4
+slab 5x5x1 concrete up 18
+tower 3x3x2 glass up 19 roof
+\`\`\``;
+const LANDMARKS = [
+  [/eiffel|paris/, 'solid 2x2x6 stone at -4,-4\nsolid 2x2x6 stone at 4,-4\nsolid 2x2x6 stone at -4,4\nsolid 2x2x6 stone at 4,4\nslab 10x10x1 concrete up 6\ntower 6x6x8 stone windows 2 up 7\nslab 6x6x1 concrete up 15\ntower 4x4x10 stone windows 2 up 16\nslab 4x4x1 concrete up 26\nsolid 2x2x8 stone up 27\ntower 2x2x3 gold up 35 roof'],
+  [/lighthouse/, 'solid 6x6x4 stone\nround 4x4x14 striped windows 3 floors 4 up 4\nslab 5x5x1 concrete up 18\ntower 3x3x2 glass up 19 roof'],
+  [/castle|fort|keep/, CB_EXAMPLES[1][1].replace(/^clear\n/, '')],
+  [/pyramid|egypt|giza/, 'pyramid 21x21 sand tnt core\npyramid 9x9 sand at -15,8\npyramid 7x7 sand at 15,-9'],
+  [/bridge/, 'tower 4x4x8 stone windows 3 at -10,0\ntower 4x4x8 stone windows 3 at 10,0\nslab 4x4x1 concrete at -10,0 up 8\nslab 4x4x1 concrete at 10,0 up 8\nslab 24x4x1 wood up 9\nsolid 2x4x9 stone at 0,0'],
+  [/colosseum|stadium|arena/, 'round 24x24x5 stone thick 2 windows 2 battlements'],
+  [/temple|parthenon|greek/, 'solid 12x8x1 marble\nsolid 1x1x5 marble at -5,-3 up 1\nsolid 1x1x5 marble at -2,-3 up 1\nsolid 1x1x5 marble at 2,-3 up 1\nsolid 1x1x5 marble at 5,-3 up 1\nsolid 1x1x5 marble at -5,3 up 1\nsolid 1x1x5 marble at -2,3 up 1\nsolid 1x1x5 marble at 2,3 up 1\nsolid 1x1x5 marble at 5,3 up 1\nslab 12x8x1 marble up 6\npyramid 12x8 marble up 7'],
+  [/sky|city|tower|building|new york|manhattan/, 'solid 12x12x1 concrete\ntower 8x8x40 glass windows 1 floors 5 up 1 roof\ntower 5x5x22 concrete windows 2 floors 4 at -11,-6\ntower 5x5x28 glass windows 1 floors 4 at 11,6 roof\ntower 4x4x16 checker windows 2 at 11,-8'],
+  [/house|cabin|home|cottage/, 'tower 7x6x4 wood windows 2 floors 3 roof\ntower 3x3x2 stone at -6,-5\nslab 3x3x1 wood at -6,-5 up 2'],
+  [/space needle|seattle|needle/, 'solid 3x3x20 concrete\nslab 9x9x1 concrete up 20\nround 7x7x2 glass up 21\nslab 9x9x1 concrete up 23\ntower 1x1x6 gold up 24']
+];
+let sampleP = null;
+function extractBlueprint(text) {
+  const m = text.match(/```(?:blueprint)?\s*\n([\s\S]*?)```/), body = m ? m[1] : text;
+  return body.split('\n').map(l => l.trim()).filter(l => l && /\d\s*[x×]\s*\d|\bslab\b/i.test(l));
+}
+async function aiBuild(desc) {
+  desc = desc.trim(); if (!desc) return;
+  const status = t => { const el = $('aiStatus'); if (el) el.textContent = t; };
+  const go = $('aiGo'); if (go) go.disabled = true;
+  const done = () => { if (go) go.disabled = false; };
+  const s = await (sampleP || (sampleP = useCap('sample')));
+  if (!s) {
+    const lm = LANDMARKS.find(([re]) => re.test(desc.toLowerCase()));
+    if (!lm) { status('AI building isn’t available here — try: Eiffel Tower, lighthouse, castle, pyramid, bridge, temple, skyscraper, house'); done(); return; }
+    if (runBlueprint(['clear', ...lm[1].split('\n')])) { closeCustom(); toast('✨ Built from the landmark library'); }
+    done(); return;
+  }
+  const msgs = [{ role: 'user', content: `${AI_GUIDE}\n\nBuild this: ${desc}` }];
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      status(attempt ? 'Fixing the design…' : 'Designing…');
+      const r = await s(msgs, { modelTier: 'default', cache: false, onText: ({ text }) => status(`Designing… ${extractBlueprint(text).length} structures so far`) });
+      const lines = extractBlueprint(r.text);
+      if (!lines.length) { status('No buildable design came back — try describing it differently'); break; }
+      cbLastErr = '';
+      if (runBlueprint(['clear', ...lines])) { $('cbBp').value = cbBlueprint = lines.join('\n'); closeCustom(); toast(`✨ ${desc.slice(0, 40)} — ${lines.length} structures`); break; }
+      msgs.push({ role: 'assistant', content: r.text }, { role: 'user', content: `Building failed: "${cbLastErr}". Fix that problem and reply with the complete corrected blueprint.` });
+    }
+  } catch (e) {
+    status(e && e.code === 'rate_limited' ? 'Too many requests — wait a moment and try again' : e && e.code === 'not_granted' ? 'AI building wasn’t allowed — using the landmark library instead' : 'Something went wrong — try again');
+    if (e && e.code === 'not_granted') sampleP = Promise.resolve(null);
+  }
+  done();
+}
+function renderAI(f) {
+  const box = document.createElement('div'); box.className = 'aibox';
+  box.innerHTML = `<div class="lab">✨ Describe it — AI builds it</div>
+    <div class="airow"><input id="aiIn" placeholder="e.g. the Eiffel Tower, a castle on a hill…" enterkeyhint="go"><button class="b1" id="aiGo">Build</button></div>
+    <div id="aiStatus" class="aist"></div><div class="chips" id="aiEx"></div>`;
+  f.appendChild(box);
+  const ex = box.querySelector('#aiEx');
+  for (const t of ['Eiffel Tower', 'Lighthouse', 'Medieval castle', 'Suspension bridge', 'Space Needle', 'Pirate ship', 'Roman temple']) {
+    const b = document.createElement('button'); b.className = 'chip ex'; b.textContent = t; b.onclick = () => { $('aiIn').value = t; aiBuild(t); }; ex.appendChild(b);
+  }
+  box.querySelector('#aiGo').onclick = () => aiBuild($('aiIn').value);
+  box.querySelector('#aiIn').onkeydown = e => { if (e.key === 'Enter') aiBuild(e.target.value); };
+}
+
 
 
 // ================= main loop =================
@@ -1696,10 +2349,16 @@ let awakeCount = 0, lastDeact = 0;
 let last = performance.now(), hudT = 0;
 function tick(now) {
   const rawDt = Math.min(.05, (now - last) / 1000); last = now;
+  if (replay) {
+    updateReplay(rawDt); updateParticles(rawDt * .55);
+    if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 1.8); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
+    flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
+  }
   const dt = rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
   preActivate(); dominoAssist(); updateFields(dt);
   if (dt > 0) P.step(clamp(dt, 1 / 400, 1 / 40), onHit);
   simTime += dt;
+  processFractures(); updateFire();
   // events
   if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }
   for (const o of objs) {
@@ -1721,6 +2380,7 @@ function tick(now) {
     if (o.meteor) { const p = o.body.position; for (let i = 0; i < 4; i++) spawnP(p.x + rand(-.3, .3), p.y + rand(-.3, .3), p.z + rand(-.3, .3), rand(-1, 1), rand(0, 2), rand(-1, 1), rand(.4, .9), i % 2 ? [1, .55, .1] : [.35, .3, .3], rand(.4, .8), 1, 2, .9); }
     if (o.bomb && !o.rocket && !o.meteor && Math.random() < .7) { const p = o.body.position; spawnP(p.x, p.y + .4, p.z, rand(-1, 1), rand(1, 3), rand(-1, 1), .35, [1, .8, .3], .12, -4, 0); }
   }
+  recordFrame();
   objs = objs.filter(o => !o.gone || o.home);
   for (const b of batches.values()) b.sync();
   if (simTime - lastDeact > 1) { lastDeact = simTime; if (!P.activeCount) deactivateResting(); }
@@ -1732,7 +2392,7 @@ function tick(now) {
   applyCamera(rawDt);
   updateAim();
   grid.visible = mode === 'build';
-  renderer.render(scene, camera);
+  renderFrame();
   if (now - hudT > 200) { hudT = now; updateHud(); }
   requestAnimationFrame(tick);
 }
@@ -1740,9 +2400,9 @@ function tick(now) {
 // ================= HUD / UI =================
 function updateHud() {
   const hud = $('hud'), blocks = objs.filter(o => o.type === 'block');
-  if (mode === 'build') { const n = blocks.filter(o => !o.gone).length; hud.textContent = `🧱 ${n} block${n === 1 ? '' : 's'}`; return; }
+  if (mode === 'build') { const n = blocks.filter(o => !o.gone).length; hud.textContent = duelBuild ? `⚔️ ${duelUsed()} / ${duelBuild.budget} budget` : `🧱 ${n} block${n === 1 ? '' : 's'}`; hud.classList.toggle('over', !!duelBuild && duelUsed() > duelBuild.budget); return; }
   const homes = blocks.filter(o => o.home);
-  if (!homes.length) { hud.textContent = 'Build a tower first!'; return; }
+  if (!homes.length) { hud.textContent = chal ? challengeHud() : 'Build a tower first!'; return; }
   let down = 0;
   for (const o of homes) {
     const h = o.home, p = o.body.position, q = o.body.quaternion;
@@ -1751,7 +2411,7 @@ function updateHud() {
   }
   const pct = Math.round(down / homes.length * 100);
   comboCheck(down);
-  if (chal) { chal.pct = pct; const L = LEVELS[chal.lv]; hud.textContent = `Lv ${chal.lv + 1} · 💥 ${pct}% · ★${L.stars.join(' ★')}`; return; }
+  if (chal) { chal.pct = pct; hud.textContent = challengeHud(); return; }
   hud.textContent = `💥 ${down}/${homes.length} toppled · ${pct}%` + (pct === 100 ? ' 🏆' : '');
 }
 let toastT;
@@ -1767,9 +2427,9 @@ function hideHint(m) { hintDone[m] = true; if (mode === m) $('hint').style.opaci
 // tray icons (2D canvas)
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 const ICOL = { wood: ['#c98a4b', '#8a5626'], stone: ['#9aa2aa', '#5d646c'], glass: ['rgba(160,220,255,.6)', '#4696cd'], tnt: ['#d4302a', '#7a1010'], marble: ['#ece7dc', '#9a958c'], roof: ['#b8472e', '#6e2414'], domino: ['#f6f1e3', '#222'] };
-function iconFor(key) {
+function iconFor(key, forMode) {
   const c = document.createElement('canvas'); c.width = c.height = 68; const x = c.getContext('2d'); x.translate(34, 34);
-  if (mode === 'build') {
+  if ((forMode || mode) === 'build') {
     const sp = BLOCKS[key].spec, [f, e] = ICOL[sp.mat]; x.fillStyle = f; x.strokeStyle = e; x.lineWidth = 3;
     if (sp.shape === 'box') {
       const m = Math.max(sp.d[0], sp.d[1]), s = 44 / Math.max(1, m), w = (sp.mat === 'domino' ? sp.d[2] : sp.d[0]) * s, h = sp.d[1] * s;
@@ -1787,6 +2447,7 @@ function iconFor(key) {
       anvil: () => { x.fillStyle = '#3d434b'; x.fillRect(-24, -14, 40, 9); x.beginPath(); x.moveTo(16, -14); x.lineTo(28, -12); x.lineTo(16, -5); x.fill(); x.fillRect(-8, -5, 12, 10); x.fillRect(-16, 5, 28, 9); },
       cannon: () => { const g = x.createRadialGradient(-7, -7, 2, 0, 0, 22); g.addColorStop(0, '#777'); g.addColorStop(1, '#1d1f22'); x.fillStyle = g; x.beginPath(); x.arc(0, 0, 21, 0, 7); x.fill(); },
       boulder: () => { x.fillStyle = '#8f8576'; x.strokeStyle = '#5e564b'; x.lineWidth = 2.5; x.beginPath(); [[-24, 6], [-16, -14], [2, -20], [20, -10], [25, 8], [10, 19], [-12, 18]].forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); x.stroke(); x.fillStyle = 'rgba(255,255,255,.18)'; x.beginPath(); x.moveTo(-16, -14); x.lineTo(2, -20); x.lineTo(-2, -4); x.closePath(); x.fill(); },
+      firebomb: () => { x.fillStyle = '#9c1d0e'; x.beginPath(); x.arc(0, 6, 17, 0, 7); x.fill(); x.fillStyle = '#5a3a20'; x.fillRect(-4, -18, 8, 10); x.fillStyle = '#ff9a2e'; x.beginPath(); x.moveTo(-6, -18); x.quadraticCurveTo(0, -34, 6, -18); x.fill(); x.fillStyle = '#ffd36b'; x.beginPath(); x.arc(-6, 0, 4, 0, 7); x.fill(); },
       cluster: () => { x.fillStyle = '#1a1a1a'; x.beginPath(); x.arc(0, 2, 17, 0, 7); x.fill(); x.fillStyle = '#ff7a1a'; [[-12, -8], [12, -8], [0, -15], [-14, 8], [14, 8]].forEach(([a, b]) => { x.beginPath(); x.arc(a, b, 5, 0, 7); x.fill(); }); },
       rocket: () => { x.rotate(-.8); x.fillStyle = '#f2f2f2'; x.fillRect(-7, -16, 14, 30); x.fillStyle = '#d8312a'; x.beginPath(); x.moveTo(-7, -16); x.lineTo(0, -28); x.lineTo(7, -16); x.fill(); x.fillRect(-12, 8, 6, 9); x.fillRect(6, 8, 6, 9); x.fillStyle = '#ffb02e'; x.beginPath(); x.moveTo(-6, 15); x.lineTo(0, 28); x.lineTo(6, 15); x.fill(); },
       meteor: () => { x.strokeStyle = '#ff9a2e'; x.lineWidth = 4; x.lineCap = 'round'; [[-24, -24, -6, -6], [-14, -28, 2, -12], [-28, -12, -12, 2]].forEach(([a, b, c, d]) => { x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); }); x.fillStyle = '#5a3a28'; x.beginPath(); x.arc(8, 8, 15, 0, 7); x.fill(); x.fillStyle = '#ff6a1a'; x.beginPath(); x.arc(4, 4, 6, 0, 7); x.fill(); },
@@ -1801,15 +2462,16 @@ function iconFor(key) {
 function buildUI() {
   const tray = $('tray'); tray.innerHTML = '';
   const list = mode === 'build' ? BLOCKS : PROJ, cur = mode === 'build' ? curBlock : curProj;
-  const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? chal.ammo.map(a => a.kind) : Object.keys(PROJ);
+  const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? (chal.pool ? Object.keys(PROJ).filter(k => !PROJ[k].special) : chal.ammo.map(a => a.kind)) : Object.keys(PROJ);
   for (const key of keys) {
     const am = chal && mode === 'throw' ? chal.ammo.find(a => a.kind === key) : null;
-    const b = document.createElement('button'); b.className = 'item' + (key === cur ? ' on' : '') + (am && !am.n ? ' empty' : '') + (mode === 'throw' && PROJ[key].special ? ' sp' : '');
-    b.appendChild(iconFor(key)); const l = document.createElement('span'); l.textContent = list[key].label + (am ? ` ×${am.n}` : ''); b.appendChild(l);
-    b.onclick = () => { if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; } buildUI(); };
+    const locked = mode === 'throw' && isLocked(key), pooled = mode === 'throw' && chal && chal.pool;
+    const b = document.createElement('button'); b.className = 'item' + (key === cur ? ' on' : '') + ((am && !am.n) || (pooled && !chal.pool.n) ? ' empty' : '') + (mode === 'throw' && PROJ[key].special ? ' sp' : '') + (locked ? ' locked' : '');
+    b.appendChild(iconFor(key)); const l = document.createElement('span'); l.textContent = locked ? `🔒 ${PRICES[key]}` : list[key].label + (am ? ` ×${am.n}` : ''); b.appendChild(l);
+    b.onclick = () => { if (locked) { openShop(); return; } if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; } buildUI(); };
     tray.appendChild(b);
   }
-  if (mode === 'throw') { const hideSize = !!chal || PROJ[curProj].special; $('sizebar').style.display = hideSize ? 'none' : 'flex'; [...$('sizebar').children].forEach((c, j) => c.classList.toggle('on', j === curSize)); }
+  if (mode === 'throw') { const hideSize = (!!chal && !chal.pool) || PROJ[curProj].special; $('sizebar').style.display = hideSize ? 'none' : 'flex'; [...$('sizebar').children].forEach((c, j) => c.classList.toggle('on', j === curSize)); }
   const icons = $('icons'); icons.innerHTML = '';
   const add = (txt, title, fn, on) => { const b = document.createElement('button'); b.className = 'ib' + (on ? ' on' : ''); b.textContent = txt; b.title = title; b.setAttribute('aria-label', title); b.onclick = fn; icons.appendChild(b); };
   if (mode === 'build') {
@@ -1818,7 +2480,7 @@ function buildUI() {
     add('🗑', 'Clear all', () => { clearAll(); snapshot = null; dirty = true; updateHud(); toast('Cleared'); });
   } else {
     add('🐢', 'Slow motion', () => { slow = !slow; toast(slow ? 'Slow-mo on' : 'Slow-mo off'); buildUI(); }, slow);
-    add('↺', 'Rebuild tower', () => chal ? startLevel(chal.lv) : (clearFields(), lastDown = null, rebuild()));
+    add('↺', 'Rebuild tower', () => chal ? startChallenge(chal.def) : (clearFields(), lastDown = null, rebuild()));
     add('🌪', 'Disasters', openDisasters);
   }
   add(muted ? '🔇' : '🔊', 'Sound', () => { muted = !muted; buildUI(); });
@@ -1826,7 +2488,9 @@ function buildUI() {
 function setMode(m) {
   mode = m; drag = null; aim = null; pointers.clear();
   $('mBuild').classList.toggle('on', m === 'build'); $('mThrow').classList.toggle('on', m === 'throw');
+  if (replay) stopReplay();
   if (m === 'build' && chal) exitChallenge();
+  $('duelBtn').style.display = m === 'build' ? 'block' : 'none'; $('replayBtn').classList.remove('show'); $('replayMenu').classList.remove('open');
   if (m === 'throw') { if (dirty || !snapshot) takeSnapshot(); cam.tEl = clamp(cam.tEl, .14, .6); lastDown = null; }
   $('sizebar').style.display = m === 'throw' ? 'flex' : 'none';
   $('levelsBtn').style.display = m === 'throw' ? 'block' : 'none';
@@ -1835,7 +2499,7 @@ function setMode(m) {
 }
 $('mBuild').onclick = () => setMode('build');
 $('customBtn').onclick = openCustom;
-$('levelsBtn').onclick = openLevels;
+$('levelsBtn').onclick = () => openLevels();
 $('nightBtn').onclick = () => setNight(!night);
 $('mThrow').onclick = () => setMode('throw');
 $('rotL').onclick = () => orbit(-Math.PI / 6, 0);
@@ -1847,6 +2511,7 @@ const cv = $('c'), pointers = new Map();
 let drag = null, pinch = null;
 cv.addEventListener('pointerdown', e => {
   initAudio();
+  if (replay) { stopReplay(); return; }
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
   if (pointers.size === 1) {
@@ -1918,6 +2583,9 @@ const snd = {
   wind() { noise(1.2, 'bandpass', 380, .35, .4); },
   rocket() { noise(.9, 'bandpass', 1100, .35, .8); },
   pop() { noise(.15, 'bandpass', 1500, .4, 1); tone(500, 200, .15, .1, 'square'); },
+  squish() { tone(320, 90, .2, .18, 'sine'); noise(.12, 'lowpass', 900, .3); },
+  crack() { noise(.09, 'highpass', 1800, .35); tone(180, 60, .1, .08, 'square'); },
+  crackle(v) { noise(.05, 'highpass', 2500 + Math.random() * 2000, .12 * v); },
   ding() { tone(880, 880, .12, .08, 'triangle'); setTimeout(() => tone(1320, 1320, .25, .08, 'triangle'), 110); },
   whoosh() { noise(.22, 'bandpass', 800, .3, .6); }
 };
@@ -1925,5 +2593,7 @@ const snd = {
 // ================= start =================
 resize(); buildUI(); updateHud(); showHint();
 loadPreset(PRESETS.find(p => p.id === 'castle'));
-window.__game = { throwAt(kind, x, y, z, pw = 1, size = 1) { curProj = kind; curSize = size; const o = launchOrigin(), tp = new THREE.Vector3(x, y, z); const { vel } = solveVelocity(o, tp, MIN_SPEED + (MAX_SPEED - MIN_SPEED) * pw); throwProj(vel, tp, pw); }, startQuake, startTornado, startLevel, setNight, LEVELS, get chal() { return chal; }, cb: { parseCmd, genStructure, pieceAABB }, kick(o, x, y, z) { activate(o); o.body.wakeUp(); o.body.setAngularVelocity(x, y, z); }, ff(sec) { for (let i = 0; i < sec * 60; i++) { preActivate(); dominoAssist(); P.step(STEP, onHit); simTime += STEP; } for (const o of objs) if (!o.gone) { syncMesh(o); o.mdirty = true; } }, setMode, get objs() { return objs; }, cam, loadPreset, PRESETS, openMenu };
+applyQuality(); updateCoins(); checkIncomingDuel();
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !inFrame) navigator.serviceWorker.register('sw.js').catch(() => {});
+window.__game = { startChallenge, campaignDef, dailyDef, duelDef, encodeFortress, unpackJSON, startReplay, stopReplay, get replay() { return replay; }, get rec() { return rec; }, fracture, ignite, igniteNear, get burning() { return burning; }, SAVE, aiBuild, runBlueprint, set duelBuild(v) { duelBuild = v; }, throwAt(kind, x, y, z, pw = 1, size = 1) { curProj = kind; curSize = size; const o = launchOrigin(), tp = new THREE.Vector3(x, y, z); const { vel } = solveVelocity(o, tp, MIN_SPEED + (MAX_SPEED - MIN_SPEED) * pw); throwProj(vel, tp, pw); }, startQuake, startTornado, startLevel, setNight, LEVELS, get chal() { return chal; }, cb: { parseCmd, genStructure, pieceAABB }, kick(o, x, y, z) { activate(o); o.body.wakeUp(); o.body.setAngularVelocity(x, y, z); }, ff(sec) { for (let i = 0; i < sec * 60; i++) { preActivate(); dominoAssist(); P.step(STEP, onHit); simTime += STEP; } for (const o of objs) if (!o.gone) { syncMesh(o); o.mdirty = true; } }, setMode, get objs() { return objs; }, cam, loadPreset, PRESETS, openMenu };
 requestAnimationFrame(t => { last = t; requestAnimationFrame(tick); });

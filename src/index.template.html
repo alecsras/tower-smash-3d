@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tower Smash">
+<meta name="theme-color" content="#5fa6e6">
+<meta name="description" content="Build towers out of thousands of blocks, then smash them with real 3D physics.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>Tower Smash 3D</title>
 <style>
 :root{--top:env(safe-area-inset-top,0px);--bot:env(safe-area-inset-bottom,0px)}
@@ -99,6 +107,39 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 @keyframes popup{0%{opacity:0;transform:translate(-50%,10px) scale(.6)}15%{opacity:1;transform:translate(-50%,0) scale(1.15)}100%{opacity:0;transform:translate(-50%,-50px) scale(1)}}
 .bigpop{position:fixed;left:50%;top:30%;z-index:3;color:#fff;font-weight:900;font-size:40px;letter-spacing:1px;white-space:nowrap;-webkit-text-stroke:2px #ff4d1a;text-shadow:0 4px 0 #b3200a,0 8px 20px rgba(0,0,0,.4);pointer-events:none;animation:bigpop 1.5s ease-out forwards}
 @keyframes bigpop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-8deg)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(3deg)}30%{transform:translate(-50%,-50%) scale(1) rotate(0)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1.05)}}
+#duelBtn{position:fixed;left:10px;top:calc(var(--top) + 100px);z-index:2;border:0;background:#d8312a;color:#fff;font:800 14px/1 inherit;font-family:inherit;padding:9px 13px;border-radius:999px;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+#coinBtn{position:fixed;right:10px;top:calc(var(--top) + 100px);z-index:2;border:0;background:rgba(18,28,48,.6);color:#ffd36b;font:800 13px/1 inherit;font-family:inherit;padding:8px 11px;border-radius:999px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.pop.coin{color:#ffd36b;font-size:16px;top:calc(var(--top) + 130px)}
+#hud.over{background:rgba(200,40,30,.8)}
+#replayBtn{position:fixed;left:10px;bottom:calc(var(--bot) + 146px);z-index:2;border:0;width:46px;height:46px;border-radius:50%;background:#18263f;color:#fff;font-size:20px;display:none;box-shadow:0 3px 12px rgba(0,0,0,.3)}
+#replayBtn.show{display:block;animation:pulse 2s infinite}@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,122,26,.35)}}
+#replayMenu{position:fixed;left:64px;bottom:calc(var(--bot) + 146px);z-index:3;display:none;flex-direction:column;gap:6px}
+#replayMenu.open{display:flex}#replayMenu button{border:0;background:#fff;color:#18263f;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,.25);text-align:left}
+#replayUI{display:none}body.replaying #replayUI{display:block}
+body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #sizebar,body.replaying #rotL,body.replaying #rotR,body.replaying #levelsBtn,body.replaying #nightBtn,body.replaying #coinBtn,body.replaying #hint,body.replaying #customBtn,body.replaying #duelBtn{visibility:hidden}
+.lb{position:fixed;left:0;right:0;height:9vh;background:#000;z-index:4;animation:lbin .4s ease-out}.lb.top{top:0}.lb.bot{bottom:0}@keyframes lbin{from{height:0}}
+#replayTag{position:fixed;top:calc(9vh + 12px);left:14px;z-index:4;color:#ff3b30;font-weight:900;font-size:14px;letter-spacing:2px;animation:blink 1s infinite}@keyframes blink{50%{opacity:.35}}
+#replayTrack{position:fixed;left:20px;right:20px;bottom:calc(9vh + 12px);height:4px;background:rgba(255,255,255,.25);border-radius:4px;z-index:4}#replayBar{height:100%;width:0;background:#ff7a1a;border-radius:4px}
+#replayStop{position:fixed;top:calc(9vh + 6px);right:12px;z-index:5;border:0;background:rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px}
+#clipBar{position:fixed;left:50%;bottom:calc(var(--bot) + 150px);transform:translateX(-50%);z-index:4;background:#18263f;color:#fff;border-radius:16px;padding:8px 8px 8px 14px;display:none;gap:8px;align-items:center;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.35)}#clipBar.open{display:flex}#clipBar .b1{margin:0;padding:9px 14px}#clipBar .b2{padding:9px 12px}
+.shopnote,.dnote{font-size:13px;color:#5a6578;margin:0 4px 10px;line-height:1.4}
+.shoprow{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:8px 10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.shoprow canvas{width:40px;height:40px;flex:none}.shoprow div{flex:1;display:flex;flex-direction:column}.shoprow small{font-size:12px;color:#5a6578}.shoprow .b1,.shoprow .b2{margin:0;padding:9px 12px;font-size:13px}
+.tog{display:flex;gap:10px;align-items:center;background:#fff;border-radius:14px;padding:10px 12px;margin-top:8px}.tog input{width:22px;height:22px;accent-color:#ff7a1a}.tog span{display:flex;flex-direction:column}.tog small{font-size:12px;color:#5a6578}
+.item.locked{filter:grayscale(.7);opacity:.75}
+.tabs{display:flex;gap:6px;margin:0 0 12px;background:#e9e4da;padding:4px;border-radius:12px}.tabs button{flex:1;border:0;background:transparent;font:800 14px/1 inherit;font-family:inherit;color:#5a6578;padding:9px 0;border-radius:9px}.tabs button.on{background:#fff;color:#18263f;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+#lgrid.camp{grid-template-columns:repeat(5,1fr);gap:7px}
+.lvlc{border:0;background:#fff;border-radius:12px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:inherit;color:#18263f;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.lvlc b{font-size:17px}.lvlc i{font-style:normal;font-size:10px;color:#f2a900;letter-spacing:1px}.lvlc.done{background:#f3ffef}.lvlc.boss{background:linear-gradient(160deg,#fff,#ffe0d0)}.lvlc.locked{opacity:.45}
+.daily{grid-column:1/-1;background:#fff;border-radius:16px;padding:16px;text-align:center;color:#18263f}.daily .em{font-size:40px}.daily p{margin:6px 0;font-size:14px}.daily .small{font-size:12px;color:#5a6578}
+.b1.wide{width:100%;grid-column:1/-1;margin:8px 0 0}
+#duelPanes .pane{display:none}#duelPanes[data-pane=home] .p-home,#duelPanes[data-pane=building] .p-building,#duelPanes[data-pane=share] .p-share{display:block}
+.quick.wide{width:100%;box-sizing:border-box;border:2px solid #e4dfd4;border-radius:10px;padding:9px 10px;font:700 15px inherit;font-family:inherit}
+#duel textarea{width:100%;box-sizing:border-box;border:2px solid #e4dfd4;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,Menlo,monospace}
+.budget{font-weight:900;font-size:22px;text-align:center;margin:8px 0}
+.aibox{background:linear-gradient(135deg,#f3ecff,#fff);border-radius:16px;padding:4px 12px 12px;margin-bottom:6px}
+.airow{display:flex;gap:8px}.airow input{flex:1;min-width:0;border:2px solid #d9cdf5;border-radius:12px;padding:10px;font:700 15px inherit;font-family:inherit}.airow .b1{margin:0;background:#7a3cff}
+.aist{font-size:12px;color:#5a3cb0;min-height:16px;margin:6px 2px}
 </style>
 </head>
 <body>
@@ -116,18 +157,52 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 <div id="charge"><div class="ring"></div><span id="chargeTxt"></span></div>
 <button id="customBtn">📐 Custom</button>
 <button id="levelsBtn">🏆 Levels</button>
+<button id="duelBtn">⚔️ Duel</button>
+<button id="coinBtn">🪙 0</button>
+<button id="replayBtn" aria-label="Replay">🎬</button>
+<div id="replayMenu"><button id="replayPlay">▶ Watch replay</button><button id="replayClip">⏺ Replay + save clip</button></div>
+<div id="replayUI"><div class="lb top"></div><div class="lb bot"></div><div id="replayTag">● REPLAY</div><div id="replayTrack"><div id="replayBar"></div></div><button id="replayStop">✕</button></div>
+<div id="clipBar"><span>🎬 Clip ready</span><button class="b1" id="clipSave">💾 Save</button><button class="b2" id="clipX">✕</button></div>
+<div id="shop" class="msheet"><div class="sheet"><div class="mh">🛒 Arsenal shop <button id="shopX" aria-label="Close">✕</button></div>
+  <p class="shopnote">Earn 🪙 by smashing (1 per 6 blocks), popping Blorbs, beating levels and playing the daily.</p>
+  <div id="shopList"></div>
+  <label class="tog"><input type="checkbox" id="sandboxChk"><span><b>Sandbox mode</b><small>Unlock every weapon — no grinding</small></span></label>
+  <label class="tog"><input type="checkbox" id="qualityChk"><span><b>High-quality graphics</b><small>Glow on fire, explosions & night windows (heavier on phones)</small></span></label></div></div>
+<div id="duel" class="msheet"><div class="sheet"><div class="mh">⚔️ Build vs Smash <button id="duelX" aria-label="Close">✕</button></div>
+  <div id="duelPanes" data-pane="home">
+  <div class="pane p-home">
+    <p class="dnote">Build a fortress on a budget, send it to a friend — they get <b>3 shots</b> to smash it. Their score rides along when they send it back.</p>
+    <div class="lab">Your name</div><input id="duelName" class="quick wide" placeholder="e.g. Alec" maxlength="16">
+    <div class="lab">Block budget <small>(TNT costs 5)</small></div>
+    <div class="chips" id="duelBudgets"><button class="chip" data-v="200">200</button><button class="chip on" data-v="400">400</button><button class="chip" data-v="800">800</button><button class="chip" data-v="2000">2,000</button></div>
+    <div class="acts"><button class="b2" id="duelUse">Use what's on the pad</button><button class="b1" id="duelFresh">Start building</button></div>
+    <div class="lab" style="margin-top:20px">Got a challenge?</div>
+    <textarea id="duelPaste" rows="3" placeholder="Paste the message or code your friend sent"></textarea>
+    <div class="acts"><button class="b1" id="duelPlay">⚔️ Play it</button></div>
+  </div>
+  <div class="pane p-building">
+    <p class="dnote">Build with the tray, 📐 Custom or 🏰 builds. When it's ready, send it.</p>
+    <div class="budget" id="duelBudgetTxt"></div>
+    <div class="acts"><button class="b2" id="duelCancel">Stop fortress mode</button><button class="b1" id="duelSend">📤 Send challenge</button></div>
+  </div>
+  <div class="pane p-share">
+    <p class="dnote" id="shareText"></p>
+    <div class="lab">Link</div><input id="shareLink" class="quick wide" readonly>
+    <div class="lab">Code <small>(works anywhere — paste into ⚔️ Duel → Got a challenge?)</small></div><textarea id="shareCode" rows="3" readonly></textarea>
+    <div class="acts"><button class="b2" id="shareCopyCode">Copy code</button><button class="b2" id="shareNative">Share…</button><button class="b1" id="shareCopyAll">📋 Copy message + link</button></div>
+  </div></div></div></div>
 <button id="nightBtn" aria-label="Night mode">🌙</button>
 <div id="whiteout"></div>
 <div id="disasters" class="msheet"><div class="sheet"><div class="mh">🌪 Disasters <button id="dX" aria-label="Close">✕</button></div>
   <div class="dgrid"><button id="dQuake" class="dcard"><span>🌍</span><b>Earthquake</b><small>The ground shakes for 5 seconds — tall towers sway and crumble</small></button>
   <button id="dTornado" class="dcard"><span>🌪️</span><b>Tornado</b><small>A twister wanders across the pad, lifting and flinging blocks</small></button>
   <button id="dMeteor" class="dcard"><span>☄️</span><b>Meteor storm</b><small>18 flaming meteors rain down on the middle of the pad</small></button></div></div></div>
-<div id="levels" class="msheet"><div class="sheet"><div class="mh">🏆 Challenges <button id="levelsX" aria-label="Close">✕</button></div><div id="lgrid"></div></div></div>
+<div id="levels" class="msheet"><div class="sheet"><div class="mh">🏆 Play <button id="levelsX" aria-label="Close">✕</button></div><div class="tabs"><button id="tab_camp">Campaign</button><button id="tab_demo">Demolition</button><button id="tab_daily">Daily</button></div><div id="lgrid"></div></div></div>
 <div id="result"><div class="rbox"><div id="rTitle"></div><div id="rStars"></div><div id="rPct"></div><div id="rMsg"></div>
-  <div class="racts"><button id="rLevels" class="b2">Levels</button><button id="rRetry" class="b2">↺ Retry</button><button id="rNext" class="b1">Next ▶</button></div></div></div>
+  <div class="racts"><button id="rLevels" class="b2">Levels</button><button id="rExtra" class="b2">Share</button><button id="rRetry" class="b2">↺ Retry</button><button id="rNext" class="b1">Next ▶</button></div></div></div>
 <div id="custom" class="menuish"><div class="sheet"><div class="mh">📐 Custom build <button id="customX" aria-label="Close">✕</button></div><div id="cform"></div></div></div>
 <div id="menu"><div class="sheet"><div class="mh">Famous builds <button id="menuX" aria-label="Close">✕</button></div><div id="mgrid"></div></div></div>
-<div id="err">This game needs WebGL, which isn't available in this browser.</div>
+<div id="err">This game needs WebGL and WebAssembly, which aren't available in this browser.</div>
 <script>/*BUNDLE*/</script>
 </body>
 </html>

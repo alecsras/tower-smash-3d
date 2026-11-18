@@ -62,6 +62,32 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 .tl.on{background:#ff7a1a;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
 #cats{bottom:calc(var(--bot) + 136px)}
 body.calm #whiteout{display:none}
+#pfGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.pfcard{position:relative;border:0;background:#fff;border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit;color:#18263f;box-shadow:0 2px 8px rgba(0,0,0,.08);cursor:pointer}
+.pfcard span{font-size:28px;line-height:34px}.pfcard b{font-size:12.5px;text-align:center}.pfcard small{font-size:10.5px;color:#6a7488}
+.pfdel{position:absolute;top:4px;right:7px;font-style:normal;color:#a0a8b8;font-size:13px}
+.slotrow{grid-column:1/-1;display:flex;align-items:center;gap:8px;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.slotrow div{flex:1;display:flex;flex-direction:column}.slotrow small{color:#6a7488;font-size:11.5px}.slotrow button{padding:9px 14px}
+#pfTabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#pfTabs .chip{flex:0 0 auto}
+#camBox{position:fixed;right:10px;top:calc(var(--top) + 146px);display:flex;flex-direction:column;gap:6px;z-index:2}
+.cb{border:0;background:rgba(18,28,48,.6);width:38px;height:38px;border-radius:50%;font-size:17px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.cb.on{background:#ff7a1a;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
+#coach{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--bot) + 240px);width:min(88vw,360px);background:#18263f;color:#fff;border-radius:16px;padding:12px 14px;z-index:4;display:none;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.35);font-weight:700;font-size:14px;line-height:1.35}
+#coach.show{display:flex;animation:coachIn .35s ease-out}#coach span{flex:1}
+#coach button{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:999px;padding:6px 10px;font:800 12px inherit;font-family:inherit}
+#coach::after{content:'';position:absolute;left:50%;bottom:-8px;border:8px solid transparent;border-bottom:0;border-top-color:#18263f;transform:translateX(-50%)}
+@keyframes coachIn{from{opacity:0;transform:translate(-50%,10px)}}
+.glowhint{animation:glowhint 1.2s ease-in-out infinite}@keyframes glowhint{50%{box-shadow:0 0 0 4px #ffd23a}}
+@media (orientation:landscape) and (max-height:520px){
+  .item{flex:0 0 52px;padding:4px 2px}.item canvas{width:26px;height:26px}.item span{font-size:10px}.item .em{font-size:20px;line-height:26px;height:26px}
+  #tray{padding:4px 70px calc(var(--bot) + 4px)}
+  #toolbar,#cats{bottom:calc(var(--bot) + 66px);padding:0 70px}#cats{bottom:calc(var(--bot) + 108px)}
+  #sizebar{bottom:calc(var(--bot) + 66px);left:auto;right:60px;transform:none}
+  .tl{height:38px;min-width:42px;font-size:15px}
+  #rotL,#rotR{bottom:calc(var(--bot) + 8px)}#replayBtn{bottom:calc(var(--bot) + 60px)}#replayMenu{bottom:calc(var(--bot) + 60px)}#detBtn{bottom:calc(var(--bot) + 150px)}
+  #coach{bottom:calc(var(--bot) + 150px)}#camBox{flex-direction:row;top:auto;bottom:calc(var(--bot) + 150px);right:10px}
+  .sheet{max-height:94vh;max-width:720px}#pfGrid{grid-template-columns:repeat(5,1fr)}
+}
 .shophead{font-weight:800;font-size:13px;color:#5a6478;margin:12px 4px 4px;text-transform:uppercase;letter-spacing:.04em}
 #news .dcard{cursor:default}
 #detBtn{position:fixed;right:10px;bottom:calc(var(--bot) + 228px);display:none;z-index:3;border:0;border-radius:999px;background:#d8312a;color:#fff;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;box-shadow:0 3px 10px rgba(0,0,0,.3)}
@@ -93,7 +119,7 @@ body.calm #whiteout{display:none}
 .b2{border:0;background:#e9e4da;color:#18263f;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;border-radius:12px}
 .b2.wide{width:100%;margin-top:8px}
 .chk{font-weight:700;font-size:13px;color:#18263f;display:flex;align-items:center;gap:5px}
-.cnt{font-weight:800;font-size:12px;color:#ff7a1a}
+.cnt{font-weight:800;font-size:12px;color:#ff7a1a}.cnt.bad{color:#d8312a}
 #cbBp{width:100%;box-sizing:border-box;border:2px solid #e4dfd4;border-radius:12px;padding:10px;font:13px/1.45 ui-monospace,Menlo,monospace;resize:vertical;margin-bottom:8px}
 .help{margin-top:12px;font-size:13px;color:#3d4757}.help summary{font-weight:800;cursor:pointer}.help code{background:#ece7dc;padding:1px 4px;border-radius:4px}
 .card.custom{grid-column:1/-1;background:linear-gradient(135deg,#fff 40%,#ffe3c8)}
@@ -130,7 +156,7 @@ body.calm #whiteout{display:none}
 #replayMenu{position:fixed;left:64px;bottom:calc(var(--bot) + 232px);z-index:3;display:none;flex-direction:column;gap:6px}
 #replayMenu.open{display:flex}#replayMenu button{border:0;background:#fff;color:#18263f;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,.25);text-align:left}
 #replayUI{display:none}body.replaying #replayUI{display:block}
-body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #sizebar,body.replaying #rotL,body.replaying #rotR,body.replaying #toolbar,body.replaying #detBtn,body.replaying #cats,body.replaying #levelsBtn,body.replaying #nightBtn,body.replaying #coinBtn,body.replaying #hint,body.replaying #customBtn,body.replaying #duelBtn{visibility:hidden}
+body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #sizebar,body.replaying #rotL,body.replaying #rotR,body.replaying #toolbar,body.replaying #camBox,body.replaying #coach,body.replaying #detBtn,body.replaying #cats,body.replaying #levelsBtn,body.replaying #nightBtn,body.replaying #coinBtn,body.replaying #hint,body.replaying #customBtn,body.replaying #duelBtn{visibility:hidden}
 .lb{position:fixed;left:0;right:0;height:9vh;background:#000;z-index:4;animation:lbin .4s ease-out}.lb.top{top:0}.lb.bot{bottom:0}@keyframes lbin{from{height:0}}
 #replayTag{position:fixed;top:calc(9vh + 12px);left:14px;z-index:4;color:#ff3b30;font-weight:900;font-size:14px;letter-spacing:2px;animation:blink 1s infinite}@keyframes blink{50%{opacity:.35}}
 #replayTrack{position:fixed;left:20px;right:20px;bottom:calc(9vh + 12px);height:4px;background:rgba(255,255,255,.25);border-radius:4px;z-index:4}#replayBar{height:100%;width:0;background:#ff7a1a;border-radius:4px}
@@ -153,6 +179,7 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
 .budget{font-weight:900;font-size:22px;text-align:center;margin:8px 0}
 .aibox{background:linear-gradient(135deg,#f3ecff,#fff);border-radius:16px;padding:4px 12px 12px;margin-bottom:6px}
 .airow{display:flex;gap:8px}.airow input{flex:1;min-width:0;border:2px solid #d9cdf5;border-radius:12px;padding:10px;font:700 15px inherit;font-family:inherit}.airow .b1{margin:0;background:#7a3cff}
+.aiopts{align-items:center;justify-content:space-between;margin-top:8px}.aiopts .b2{margin:0;padding:8px 12px}
 .aist{font-size:12px;color:#5a3cb0;min-height:16px;margin:6px 2px}
 </style>
 </head>
@@ -167,7 +194,7 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
 <div id="toast"></div>
 <div id="tray"></div>
 <button class="ib" id="rotL" aria-label="Rotate view left">◀</button><button class="ib" id="rotR" aria-label="Rotate view right">▶</button>
-<div id="sizebar"></div><div id="toolbar"></div><button id="detBtn" class="pill">💥 Detonate</button><div id="cats"></div>
+<div id="sizebar"></div><div id="toolbar"></div><div id="camBox"><button class="cb" id="camFit" aria-label="Frame the build">🎯</button><button class="cb" id="camFollow" aria-label="Follow camera">🎥</button><button class="cb" id="camFree" aria-label="Free camera">🕹️</button></div><div id="coach"><span id="coachTxt"></span><button id="coachSkip">Skip</button></div><button id="detBtn" class="pill">💥 Detonate</button><div id="cats"></div>
 <div id="charge"><div class="ring"></div><span id="chargeTxt"></span></div>
 <button id="customBtn">📐 Custom</button>
 <button id="levelsBtn">🏆 Levels</button>
@@ -181,6 +208,7 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
   <p class="shopnote">Earn 🪙 by smashing (1 per 6 blocks), popping Blorbs, beating levels and playing the daily.</p>
   <div id="shopList"></div>
   <label class="tog"><input type="checkbox" id="sandboxChk"><span><b>Sandbox mode</b><small>Unlock every weapon — no grinding</small></span></label>
+  <button class="b2" id="tutBtn" style="width:100%;margin:8px 0">🎓 Replay the tutorial</button>
   <label class="tog"><input type="checkbox" id="calmChk"><span><b>Reduce motion</b><small>No screen shake or flashes</small></span></label>
   <label class="tog"><input type="checkbox" id="qualityChk"><span><b>High-quality graphics</b><small>Glow on fire, explosions & night windows (heavier on phones)</small></span></label></div></div>
 <div id="duel" class="msheet"><div class="sheet"><div class="mh">⚔️ Build vs Smash <button id="duelX" aria-label="Close">✕</button></div>
@@ -209,11 +237,14 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
 <button id="nightBtn" aria-label="Night mode">🌙</button>
 <div id="whiteout"></div>
 <div id="news" class="msheet"><div class="sheet"><div class="mh">✨ What's new <button id="newsX" aria-label="Close">✕</button></div>
-  <div class="dgrid"><div class="dcard"><span>📏</span><b>Build tools</b><small>Drag to build lines, filled boxes or hollow walls up to 12 layers high. Erase, paint and copy blocks by swiping. Mirror builds both halves at once. Undo and redo everything.</small></div>
-  <div class="dcard"><span>🧱</span><b>New pieces &amp; materials</b><small>Steel, brick, ice, rubber, crystal and obsidian, plus girders, beams, slabs, half blocks, ridges and drums. Each one feels different: ice slides, rubber bounces, crystal shatters.</small></div>
-  <div class="dcard"><span>💥</span><b>30 new weapons</b><small>Railgun, drill, wrecking ball, sticky bombs, remote C4, carpet bomber, lightning, tidal wave, volcano, laser satellite, antimatter… and a piano. Filter them by type above the tray.</small></div>
-  <div class="dcard"><span>🎯</span><b>Smoother play</b><small>Tap 🎯 to frame your build. Shockwave rings and scorch marks on every blast. Reduce motion in the 🪙 menu.</small></div></div>
+  <div class="dgrid"><div class="dcard"><span>🧩</span><b>64 prefabs &amp; save slots</b><small>Towers, gates, homes, landmarks, bridges, domes and traps you can drop anywhere. Save your own builds as prefabs, and keep three builds in save slots.</small></div>
+  <div class="dcard"><span>📐</span><b>Blueprint 2.0</b><small>Domes, spheres, cones, arches, gates, bridges and spiral stairs. Name structures and stack them with “on”, plus arrays, rings, mirrors and rotation. Mistakes show up as you type.</small></div>
+  <div class="dcard"><span>✨</span><b>Smarter AI builder</b><small>Pick a style, preview the plan first, ask for changes to the last design, or build from a photo. 40 landmarks work even offline.</small></div>
+  <div class="dcard"><span>🎥</span><b>Camera &amp; feel</b><small>Follow cam chases your shots, free cam slides around the scene. Test gravity ⚖️ and auto-support 🏗️ for your builds. Billowing smoke and layered, directional explosion sound.</small></div>
+  <div class="dcard"><span>💥</span><b>Plus last update</b><small>Line, box and wall tools, new materials, and 30 new weapons.</small></div></div>
   <button id="newsGo" class="b1" style="width:100%;margin-top:12px">Let's smash</button></div></div>
+<div id="prefabs" class="msheet"><div class="sheet"><div class="mh">🧩 Prefabs <button id="pfX" aria-label="Close">✕</button></div>
+  <div class="chips" id="pfTabs"></div><div id="pfNameRow" class="airow" style="display:none;margin:8px 0"><input id="pfName" placeholder="Name (optional)" maxlength="30"></div><div id="pfGrid"></div></div></div>
 <div id="disasters" class="msheet"><div class="sheet"><div class="mh">🌪 Disasters <button id="dX" aria-label="Close">✕</button></div>
   <div class="dgrid"><button id="dQuake" class="dcard"><span>🌍</span><b>Earthquake</b><small>The ground shakes for 5 seconds — tall towers sway and crumble</small></button>
   <button id="dTornado" class="dcard"><span>🌪️</span><b>Tornado</b><small>A twister wanders across the pad, lifting and flinging blocks</small></button>

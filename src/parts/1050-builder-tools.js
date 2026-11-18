@@ -105,7 +105,7 @@ function toolUp(moved) {
     out.push(createPiece(f.spec, x, top + f.hgt / 2 + .005, z, qY(f.rot), true));
   }
   clearGhost();
-  if (out.length) { out.forEach(o => { o.pop = 1; o.mdirty = true; }); pushHistory(out); dirty = true; snd.place(); toast(`🧱 +${out.length} blocks`); }
+  if (out.length) { out.forEach(o => { o.pop = 1; o.mdirty = true; }); pushHistory(out); dirty = true; snd.place(); toast(`🧱 +${out.length} blocks`); if (tool === 'line') coach('line'); }
   updateHud();
 }
 function brushAt(x, y) {
@@ -145,7 +145,7 @@ function pickAt(x, y) {
 }
 
 // ---- toolbar ----
-function setTool(t) { tool = t; clearGhost(); renderToolbar(); if (mode === 'build') toast(TOOL_TIPS[t]); }
+function setTool(t) { tool = t; clearGhost(); stopPlacing(); renderToolbar(); if (mode === 'build') toast(TOOL_TIPS[t]); }
 const TOOL_TIPS = {
   place: 'Tap to stack one piece', line: 'Drag (or tap two points) to build a line',
   box: 'Drag a rectangle to fill it', walls: 'Drag a rectangle to build hollow walls',
@@ -155,6 +155,8 @@ const TOOL_TIPS = {
 function renderToolbar() {
   const bar = $('toolbar'); if (!bar) return; bar.innerHTML = '';
   bar.style.display = mode === 'build' ? 'flex' : 'none';
+  const pf = document.createElement('button'); pf.className = 'tl'; pf.innerHTML = '🧩<small>Prefabs</small>'; pf.setAttribute('aria-label', 'Prefabs and saves'); pf.onclick = openPrefabs; bar.appendChild(pf);
+  bar.appendChild(document.createElement('i'));
   for (const [k, ic, lab] of TOOLS) {
     const b = document.createElement('button'); b.className = 'tl' + (tool === k ? ' on' : ''); b.innerHTML = `${ic}<small>${lab}</small>`;
     b.setAttribute('aria-label', lab); b.onclick = () => setTool(k); bar.appendChild(b);
@@ -168,4 +170,6 @@ function renderToolbar() {
   mb.setAttribute('aria-label', 'Mirror across the middle'); mb.onclick = () => { mirrorX = !mirrorX; renderToolbar(); toast(mirrorX ? '🪞 Mirror on — builds copy across the middle' : 'Mirror off'); };
   bar.appendChild(mb);
   const rb = document.createElement('button'); rb.className = 'tl'; rb.innerHTML = `↷<small>Redo</small>`; rb.setAttribute('aria-label', 'Redo'); rb.onclick = redo; bar.appendChild(rb);
+  bar.appendChild(document.createElement('i'));
+  for (const [ic, lab, fn] of [['⚖️', 'Test', testGravity], ['🏗️', 'Support', autoSupport]]) { const b = document.createElement('button'); b.className = 'tl'; b.innerHTML = `${ic}<small>${lab}</small>`; b.setAttribute('aria-label', lab); b.onclick = fn; bar.appendChild(b); }
 }

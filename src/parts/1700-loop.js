@@ -46,7 +46,7 @@ function tick(now) {
   flash.intensity *= Math.pow(.004, rawDt);
   updateParticles(dt);
   updateShock(rawDt); checkLevelEnd();
-  applyCamera(rawDt);
+  updateFollow(); applyCamera(rawDt);
   updateAim();
   grid.visible = mode === 'build';
   renderFrame();

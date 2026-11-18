@@ -97,7 +97,7 @@ function explodeAt(c, power = 1, style) {
     if (dist < R * .75) ignite(q, power > 2 ? .9 : .35);
     if (q.type === 'blorb' && dist < R * .8) q.hitHard = true;
   }
-  recFx(c, power); explosionFX(c, power, style);
+  recFx(c, power); explosionFX(c, power, style); followBoom(c);
 }
 const BOOM_STYLE = {
   fire: { flash: 0xffaa44, ball: () => [1, rand(.45, .85), rand(.05, .25)], ring: 0xfff1c8 },
@@ -112,9 +112,10 @@ function explosionFX(c, power, style = 'fire') {
   ringFX(c, power, S.ring); scorch(c, power);
   for (let i = 0; i < 70; i++) { const a = rand(0, 6.28), e = rand(-.3, 1.3), s = rand(3, 11) * power;
     spawnP(c.x, c.y, c.z, Math.cos(a) * Math.cos(e) * s, Math.sin(e) * s + 2, Math.sin(a) * Math.cos(e) * s, rand(.35, .8), S.ball(), rand(.35, .7), -3, 1.5); }
-  for (let i = 0; i < 30; i++) spawnP(c.x + rand(-.6, .6), c.y + rand(0, .8), c.z + rand(-.6, .6), rand(-1.5, 1.5), rand(1, 3.5), rand(-1.5, 1.5), rand(1.2, 2.2), [.35, .35, .35].map(x => x + rand(0, .15)), rand(.7, 1.2), 0, 2.2, .55);
+  for (let i = 0; i < 14 + 8 * power; i++) { const a = rand(0, 6.28), s = rand(.5, 3.5) * Math.sqrt(power); spawnSmoke(c.x + rand(-.6, .6) * power, c.y + rand(0, .8), c.z + rand(-.6, .6) * power, Math.cos(a) * s, rand(1, 3.5), Math.sin(a) * s, rand(2.5, 4.5) * Math.sqrt(power), rand(1.6, 2.8) * Math.sqrt(power), [.3, .29, .28].map(x => x + rand(0, .12)), .75); }
+  for (let i = 0; i < 6; i++) spawnSmoke(c.x, c.y + .3, c.z, rand(-1, 1), rand(2, 4), rand(-1, 1), rand(.5, .9), rand(1.5, 2.2) * Math.sqrt(power), [1, .55, .2], .8);
   for (let i = 0; i < 26; i++) spawnP(c.x, c.y, c.z, rand(-9, 9), rand(3, 13), rand(-9, 9), rand(.8, 1.6), [.25, .18, .1], .14, -20, 0);
-  shake = .55 * power; snd.boom();
+  shake = .55 * power; boomLayered(power, c);
   try { navigator.vibrate && navigator.vibrate(70); } catch (e) {}
 }
 

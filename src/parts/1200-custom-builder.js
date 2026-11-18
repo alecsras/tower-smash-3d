@@ -2,10 +2,10 @@
 // Structures are described by a small command language, e.g.
 //   hollow 6x6x30 glass windows 3 floors 5 roof at -8,4
 // The form below writes these lines for you; the Blueprint box runs many lines at once.
-const CB_SHAPES = { solid: 'Solid', hollow: 'Tower', round: 'Round', pyramid: 'Pyramid', wall: 'Wall', stairs: 'Stairs', slab: 'Slab' };
+const CB_SHAPES = { solid: 'Solid', hollow: 'Tower', round: 'Round', pyramid: 'Pyramid', wall: 'Wall', stairs: 'Stairs', slab: 'Slab', dome: 'Dome', sphere: 'Sphere', cone: 'Cone', arch: 'Arch', bridge: 'Bridge', spiral: 'Spiral stairs', gate: 'Gate' };
 let cbLastErr = '';
 const CB_MATS = ['stone', 'wood', 'glass', 'marble', 'concrete', 'sand', 'gold', 'tnt', 'steel', 'brick', 'ice', 'rubber', 'crystal', 'obsidian', 'striped', 'checker', 'random'];
-const CB_SHAPE_WORDS = { solid: 'solid', block: 'solid', cube: 'solid', box: 'solid', hollow: 'hollow', tower: 'hollow', building: 'hollow', house: 'hollow', keep: 'hollow',
+const CB_SHAPE_WORDS = { dome: 'dome', arch: 'arch', archway: 'arch', sphere: 'sphere', ball: 'sphere', orb: 'sphere', cone: 'cone', bridge: 'bridge', spiral: 'spiral', gate: 'gate', gatehouse: 'gate', solid: 'solid', block: 'solid', cube: 'solid', box: 'solid', hollow: 'hollow', tower: 'hollow', building: 'hollow', house: 'hollow', keep: 'hollow',
   round: 'round', cylinder: 'round', circle: 'round', silo: 'round', pyramid: 'pyramid', wall: 'wall', stairs: 'stairs', staircase: 'stairs', steps: 'stairs', slab: 'slab', deck: 'slab', platform: 'slab' };
 const CB_MAX_DIM = 40, CB_MAX_H = 60, CB_MAX_BLOCKS = 12000;
 const cbDefault = () => ({ shape: 'hollow', w: 5, l: 5, h: 30, mat: 'stone', x: 0, z: 0, up: 0, thick: 1, windows: 4, floors: 0, crenels: false, roof: true, tnt: false });
@@ -16,6 +16,9 @@ function parseCmd(line) {
   for (const [w, s] of Object.entries(CB_SHAPE_WORDS)) if (new RegExp('\\b' + w + '\\b').test(t)) { c.shape = s; break; }
   if (c.shape === 'wall') { c.w = 15; c.l = 1; c.h = 6; }
   if (c.shape === 'slab') { c.w = 6; c.l = 6; c.h = 1; }
+  const D2 = { sphere: [9, 9, 9], dome: [11, 11, 6], cone: [9, 9, 9], arch: [9, 2, 7], bridge: [20, 3, 5], spiral: [7, 7, 20], gate: [15, 2, 9] }[c.shape];
+  if (D2) [c.w, c.l, c.h] = D2;
+  const one = t.match(/^\s*\w+\s+(\d+)\b(?!\s*[x×w])/) || t.match(/\bsize\s*=?\s*(\d+)/);
   // dimensions: 5x5x30, 5wx5lx30h, 30h x 5w x 5l, 12x6 (length x height for walls) ...
   const U = '\\s*(?:([wlh])(?![a-z]))?'; const dm = t.match(new RegExp('(\\d+)' + U + '\\s*x\\s*(\\d+)' + U + '(?:\\s*x\\s*(\\d+)' + U + ')?'));
   if (dm) {
@@ -24,7 +27,8 @@ function parseCmd(line) {
     const used = new Set(nums.filter(n => n[1]).map(n => n[1]));
     const free = order.filter(k => !used.has(k)).concat(['w', 'l', 'h'].filter(k => !used.has(k) && !order.includes(k)));
     for (const [n, k] of nums) c[k || free.shift()] = n;
-  }
+    if (nums.length === 2 && ['sphere', 'dome', 'cone', 'spiral'].includes(c.shape)) c.l = c.w;
+  } else if (one && ['sphere', 'dome', 'cone', 'spiral'].includes(c.shape)) { c.w = c.l = +one[1]; if (c.shape !== 'dome' && c.shape !== 'spiral') c.h = +one[1]; }
   for (const k of ['w', 'l', 'h']) { const m = t.match(new RegExp('\\b' + k + '(?:idth|ength|eight)?\\s*=?\\s*(\\d+)\\b')); if (m) c[k] = +m[1]; }
   for (const m of CB_MATS) if (new RegExp('\\b' + m + '\\b').test(t.replace(/\btnt core\b/, ''))) { c.mat = m; break; }
   const at = t.match(/(?:\bat\b|@)\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/); if (at) { c.x = +at[1]; c.z = +at[2]; }
@@ -34,7 +38,8 @@ function parseCmd(line) {
   const fl = num(/\bfloors?\s*=?\s*(\d+)?/, 4); if (fl != null) c.floors = fl;
   const th = num(/\b(?:thick|thickness|walls?)\s*=?\s*(\d+)/); if (th != null && th > 0) c.thick = th;
   c.crenels = /\b(battlements?|crenels?|crenellations?)\b/.test(t);
-  c.roof = /\b(roof|spire|cone)\b/.test(t);
+  c.roof = /\b(roof|spire|cone)\b/.test(t) && c.shape !== 'cone';
+  const rm = t.match(/\brot(?:ate|ation)?\s*=?\s*(-?\d+)/); if (rm) c.rot = +rm[1];
   c.tnt = /\btnt\s*core\b|\bcore\b/.test(t);
   c.w = clamp(Math.round(c.w), 1, CB_MAX_DIM); c.l = clamp(Math.round(c.l), 1, CB_MAX_DIM); c.h = clamp(Math.round(c.h), 1, CB_MAX_H);
   if (c.shape === 'slab') c.h = clamp(c.h, 1, 3);
@@ -52,6 +57,7 @@ function cfgToCmd(c) {
   if (c.tnt) parts.push('tnt core');
   if (c.x || c.z) parts.push(`at ${c.x},${c.z}`);
   if (c.up) parts.push('up ' + c.up);
+  if (c.rot) parts.push('rot ' + c.rot);
   return parts.join(' ');
 }
 
@@ -62,6 +68,7 @@ function genStructure(c) {
   return res;
 }
 function genStructure0(c) {
+  if (GEN2[c.shape]) return GEN2[c.shape](c);
   if (c.shape === 'slab') return [{ spec: Bx(DENS[c.mat] ? c.mat : 'stone', c.w * G - .01, c.h, c.l * G - .01), x: c.x, y: 0, z: c.z }];
   const out = [], R = rng(c.w * 73 + c.l * 31 + c.h * 7 + Math.round(c.x * 13 + c.z * 17) + c.shape.length);
   const matAt = (i, j, L) => {
@@ -138,7 +145,7 @@ function genStructure0(c) {
 function pieceAABB(p) {
   const s = p.spec, h = specHeight(s);
   let hx, hz;
-  if (s.shape === 'box' || s.shape === 'wedge') { hx = s.d[0] / 2; hz = s.d[2] / 2; if (p.rot) [hx, hz] = [hz, hx]; } else hx = hz = s.shape === 'cone' ? s.d[0] : Math.max(s.d[0], s.d[1]);
+  if (s.shape === 'box' || s.shape === 'wedge') { const a = s.d[0] / 2, b = s.d[2] / 2, co = Math.abs(Math.cos(p.rot || 0)), si = Math.abs(Math.sin(p.rot || 0)); hx = a * co + b * si; hz = a * si + b * co; } else hx = hz = s.shape === 'cone' ? s.d[0] : Math.max(s.d[0], s.d[1]);
   return { lowerBound: { x: p.x - hx, y: p.y, z: p.z - hz }, upperBound: { x: p.x + hx, y: p.y + h, z: p.z + hz } };
 }
 function spaceTaken(pieces) {
@@ -152,37 +159,6 @@ function spaceTaken(pieces) {
   }
   return false;
 }
-// build a list of command lines; returns false if it didn't build
-function runBlueprint(lines, { replace = false } = {}) {
-  const cfgs = []; let doClear = replace;
-  for (const raw of lines) { const l = raw.trim(); if (!l || l.startsWith('#') || l.startsWith('//')) continue; if (/^clear\b/i.test(l)) { doClear = true; continue; } cfgs.push(parseCmd(l)); }
-  if (!cfgs.length) { if (doClear) { clearAll(); snapshot = null; dirty = true; updateHud(); toast('Cleared'); } return false; }
-  const all = cfgs.map(genStructure), total = all.reduce((n, a) => n + a.length, 0);
-  if (total + (doClear ? 0 : objs.filter(o => !o.gone && o.type === 'block').length) > CB_MAX_BLOCKS) { cbLastErr = `Too big: ${total.toLocaleString()} blocks (max ${CB_MAX_BLOCKS.toLocaleString()})`; toast(cbLastErr); return false; }
-  if (doClear) { clearAll(); snapshot = null; }
-  const flat = all.flat();
-  { // structures in one blueprint must not overlap each other
-    const hm = new Map();
-    for (let k = 0; k < all.length; k++) {
-      let clash = -1;
-      for (const p of all[k]) { const a = pieceAABB(p); forCells(a, 0, key => { const l = hm.get(key); if (l) for (const [b, kk] of l) if (kk !== k && clash < 0 && overlap(a, b, -.06)) clash = kk; }); if (clash >= 0) break; }
-      if (clash >= 0) { cbLastErr = `Structures ${clash + 1} and ${k + 1} overlap — change “at” or “up”`; toast(cbLastErr); return false; }
-      for (const p of all[k]) { const a = pieceAABB(p); forCells(a, 0, key => { let l = hm.get(key); if (!l) hm.set(key, l = []); l.push([a, k]); }); }
-    }
-  }
-  if (!doClear && spaceTaken(flat)) { cbLastErr = 'That spot is taken — move it, or turn on “Clear first”'; toast(cbLastErr); return false; }
-  let need = buildR, top = 0, ext = 6;
-  for (const c of cfgs) { need = Math.max(need, Math.ceil(Math.max(Math.abs(c.x) + c.w / 2, Math.abs(c.z) + c.l / 2) + 1)); }
-  for (const p of flat) { top = Math.max(top, p.y + specHeight(p.spec)); ext = Math.max(ext, Math.abs(p.x) + 1, Math.abs(p.z) + 1); }
-  if (need > buildR) setArena(Math.min(need, 34));
-  const group = flat.map(p => put(p.spec, p.x, p.y, p.z, p.rot));
-  placed.push(group); dirty = true; curPreset = null;
-  cam.tR = clamp(Math.max(ext * 2.7, top * 1.9, 18), 14, 95); cam.target.y = clamp(top * .3, 1.5, 12); cam.tEl = Math.max(cam.tEl, .35);
-  updateHud(); hideHint('build');
-  toast(`Built ${total.toLocaleString()} blocks`);
-  return true;
-}
-
 // ---- the Custom build sheet ----
 let cbCfg = cbDefault(), cbPlacing = null, cbClearFirst = false;
 const CB_EXAMPLES = [
@@ -190,6 +166,8 @@ const CB_EXAMPLES = [
   ['Castle kit', 'clear\nwall 15x1x7 stone battlements at 0,-10\nwall 15x1x7 stone battlements at 0,10\nwall 1x15x7 stone battlements at -10,0\nwall 1x15x7 stone battlements at 10,0\nround 5x5x12 stone windows 4 roof at -10.5,-10.5\nround 5x5x12 stone windows 4 roof at 10.5,-10.5\nround 5x5x12 stone windows 4 roof at -10.5,10.5\nround 5x5x12 stone windows 4 roof at 10.5,10.5\ntower 7x7x16 checker windows 3 floors 4 roof tnt core'],
   ['Mega pyramid', 'clear\npyramid 27x27 sand tnt core'],
   ['Silo farm', 'clear\nround 6x6x18 concrete thick 1 roof at -8,-8\nround 6x6x18 concrete roof at 0,-8\nround 6x6x18 concrete roof at 8,-8\nsolid 20x3x3 wood at 0,0\nstairs 8x3x8 stone at 0,6'],
+  ['Ring fortress', 'clear\nkeep: tower 8x8x14 stone windows 3 floors 4 battlements\non keep: dome 8x8x4 marble\naround 0,0 radius 14 count 8: round 4x4x9 brick roof\nmirror x: gate 7x2x6 stone at 7,-14\narray 2x1 spacing 10: arch 5x2x5 marble at 0,14'],
+  ['Domes & spheres', 'clear\nsphere 9 glass at -9,0\ndome 11x11x6 marble at 6,0\ncone 7x7x9 brick at 6,10\nspiral 7x7x18 stone at -9,11\nbridge 18x3x6 wood at 0,-12'],
   ['Skyscraper', 'clear\nsolid 12x12x1 concrete\ntower 8x8x50 glass windows 1 floors 5 up 1 roof']
 ];
 function cbChips(parent, items, cur, on) {
@@ -274,7 +252,7 @@ function renderCustom() {
   $('cbRun').onclick = () => { if (runBlueprint($('cbBp').value.split('\n'), { replace: $('cbClear').checked })) closeCustom(); };
   ta.addEventListener('input', cbUpdate);
   const help = document.createElement('details'); help.className = 'help';
-  help.innerHTML = `<summary>Command cheat-sheet</summary><p><b>Shapes:</b> solid, tower (hollow), round, pyramid, wall, stairs<br><b>Size:</b> <code>5x5x30</code> or <code>5w x 5l x 30h</code> (max ${CB_MAX_DIM}×${CB_MAX_DIM}×${CB_MAX_H})<br><b>Materials:</b> ${CB_MATS.join(', ')}<br><b>Extras:</b> <code>windows 3</code> · <code>floors 5</code> · <code>thick 2</code> · <code>battlements</code> · <code>roof</code> · <code>tnt core</code><br><b>Where:</b> <code>at -8,4</code> (x,z from the center) · <code>up 3</code> starts it 3 blocks up, to stack on another structure<br><b>clear</b> on its own line empties the pad first.<br>Up to ${CB_MAX_BLOCKS.toLocaleString()} blocks total.</p>`;
+  help.innerHTML = `<summary>Command cheat-sheet</summary><p><b>Shapes:</b> solid, tower (hollow), round, pyramid, wall, stairs<br><b>Size:</b> <code>5x5x30</code> or <code>5w x 5l x 30h</code> (max ${CB_MAX_DIM}×${CB_MAX_DIM}×${CB_MAX_H})<br><b>Materials:</b> ${CB_MATS.join(', ')}<br><b>Extras:</b> <code>windows 3</code> · <code>floors 5</code> · <code>thick 2</code> · <code>battlements</code> · <code>roof</code> · <code>tnt core</code><br><b>Where:</b> <code>at -8,4</code> (x,z from the center) · <code>up 3</code> starts it 3 blocks up, to stack on another structure<br><b>More shapes:</b> dome, sphere, cone, arch, gate, bridge, spiral (stairs) · <code>rot 45</code> turns a structure<br><b>Names &amp; stacking:</b> <code>keep: tower 8x8x14 stone</code> then <code>on keep: dome 8x8x4 marble</code><br><b>Copies:</b> <code>array 3x2 spacing 8: …</code> · <code>around 0,0 radius 12 count 8: …</code> · <code>mirror x: …</code> (x, z or xz)<br><b>clear</b> on its own line empties the pad first.<br>Up to ${CB_MAX_BLOCKS.toLocaleString()} blocks total.</p>`;
   f.appendChild(help);
   cbUpdate();
 }
@@ -284,9 +262,9 @@ function cbUpdate() {
   const n = genStructure(cbCfg).length;
   el.innerHTML = `<code>${cfgToCmd(cbCfg)}</code><b>${n.toLocaleString()} blocks</b>`;
   const ta = $('cbBp'); if (ta) {
-    const lines = ta.value.split('\n').filter(l => l.trim() && !/^\s*(clear|#|\/\/)/i.test(l));
-    const tot = lines.reduce((s, l) => s + genStructure(parseCmd(l)).length, 0);
-    $('bpCount').textContent = lines.length ? `${lines.length} structure${lines.length > 1 ? 's' : ''} · ${tot.toLocaleString()} blocks` : '';
+    const C = compileBlueprint(ta.value.split('\n')), tot = C.structs.reduce((n, a) => n + a.length, 0), el2 = $('bpCount');
+    el2.classList.toggle('bad', !!C.err || tot > CB_MAX_BLOCKS);
+    el2.textContent = C.err ? '⚠️ ' + C.err : C.structs.length ? `${C.structs.length} structure${C.structs.length > 1 ? 's' : ''} · ${tot.toLocaleString()} blocks${tot > CB_MAX_BLOCKS ? ' — too many' : ''}` : '';
   }
 }
 function openCustom() { renderCustom(); $('custom').classList.add('open'); }

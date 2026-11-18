@@ -36,6 +36,11 @@ function solveVelocity(from, to, v) {
 }
 function throwProj(vel, target, pw = 1) {
   if (!useAmmo()) { toast('Out of ammo — tap ↺ to retry'); return; }
+  coach('shoot'); const nBefore = objs.length;
+  throwProj0(vel, target, pw);
+  const o = objs.slice(nBefore).find(q => q.type === 'proj'); if (o) followShot(o); else { if (followOn && !homeTarget && mode === 'throw') homeTarget = cam.target.clone(); followBoom(target); }
+}
+function throwProj0(vel, target, pw) {
   if (PROJ[curProj].special) { throwSpecial(curProj, vel, target, pw); return; }
   const p = PROJ[curProj], f = sizeF(), o0 = launchOrigin();
   let shape;

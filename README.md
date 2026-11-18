@@ -31,6 +31,15 @@ Install it on a phone: open the link, then choose **Share → Add to Home Screen
 - **Mirror** copies everything across the middle. **Undo/redo** covers every action.
 - New materials (steel, brick, ice, rubber, crystal, obsidian), each with its own weight, friction and bounce, plus girders, beams, slabs, half blocks, ridges and drums.
 
+## Prefabs, blueprints & AI
+- **64 prefabs** in 8 groups (towers, walls & gates, homes, landmarks, bridges & arches, domes, traps, fun): tap one, then tap the pad to drop it. Save your own builds as prefabs, and keep 3 builds in save slots.
+- **Blueprint 2.0**: dome, sphere, cone, arch, gate, bridge and spiral shapes; `rot 45`; `name:` + `on name:` stacking; `array 3x2 spacing 8:`; `around 0,0 radius 12 count 8:`; `mirror x:`. Errors show as you type.
+- **AI builder**: style chips, "show the plan first", follow-up changes to the last design, build from a photo, and 40 offline landmarks.
+- **Stability**: ⚖️ Test runs gravity on your build (undo puts it back); 🏗️ Support fills gaps under overhangs.
+
+## Camera & feel
+Follow cam (🎥) chases shots, free cam (🕹️) slides around, 🎯 frames the build. Guided tutorial on first launch (replay it from the 🪙 menu), landscape layout, billowing smoke, and layered explosion sound that is panned and quieter with distance.
+
 ## Arsenal
 30 weapons on top of the originals, filterable by type:
 - **Kinetic**: wrecking ball, battering ram, shotgun, minigun, railgun, drill, spike ball, grapple hook.

@@ -67,7 +67,7 @@ function buildUI() {
   const inCat = k => wcat === 'all' || (wcat === 'classic' ? !PROJ[k].special : wcat === 'power' ? PROJ[k].special && !PROJ[k].cat : PROJ[k].cat === wcat);
   const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? (chal.pool ? Object.keys(PROJ).filter(k => !PROJ[k].special) : chal.ammo.map(a => a.kind)) : Object.keys(PROJ).filter(k => !PROJ[k].hidden && inCat(k));
   const cats = $('cats'); cats.innerHTML = ''; cats.style.display = mode === 'throw' && !chal ? 'flex' : 'none';
-  if (mode === 'throw' && !chal) for (const [k, lab] of WCATS) { const b = document.createElement('button'); b.textContent = lab; b.className = k === wcat ? 'on' : ''; b.onclick = () => { wcat = k; const first = Object.keys(PROJ).find(q => !PROJ[q].hidden && inCat(q)); if (first && !inCat(curProj)) curProj = first; buildUI(); $('tray').scrollLeft = 0; }; cats.appendChild(b); }
+  if (mode === 'throw' && !chal) for (const [k, lab] of WCATS) { const b = document.createElement('button'); b.textContent = lab; b.className = k === wcat ? 'on' : ''; b.onclick = () => { if (['explosive', 'elemental', 'exotic'].includes(k)) coach('arsenal'); wcat = k; const first = Object.keys(PROJ).find(q => !PROJ[q].hidden && inCat(q)); if (first && !inCat(curProj)) curProj = first; buildUI(); $('tray').scrollLeft = 0; }; cats.appendChild(b); }
   for (const key of keys) {
     const am = chal && mode === 'throw' ? chal.ammo.find(a => a.kind === key) : null;
     const locked = mode === 'throw' && isLocked(key), pooled = mode === 'throw' && chal && chal.pool;
@@ -81,13 +81,11 @@ function buildUI() {
   const add = (txt, title, fn, on) => { const b = document.createElement('button'); b.className = 'ib' + (on ? ' on' : ''); b.textContent = txt; b.title = title; b.setAttribute('aria-label', title); b.onclick = fn; icons.appendChild(b); };
   if (mode === 'build') {
     add('🏰', 'Famous builds', openMenu);
-    add('🎯', 'Frame the build', fitView);
     add('↶', 'Undo', undo);
     add('🗑', 'Clear all', () => { clearAll(); snapshot = null; dirty = true; updateHud(); toast('Cleared'); });
   } else {
     add('🐢', 'Slow motion', () => { slow = !slow; toast(slow ? 'Slow-mo on' : 'Slow-mo off'); buildUI(); }, slow);
     add('↺', 'Rebuild tower', () => chal ? startChallenge(chal.def) : (clearFields(), lastDown = null, rebuild()));
-    add('🎯', 'Frame the build', fitView);
     add('🌪', 'Disasters', openDisasters);
   }
   add(muted ? '🔇' : '🔊', 'Sound', () => { muted = !muted; buildUI(); });
@@ -102,7 +100,8 @@ function setMode(m) {
   $('sizebar').style.display = m === 'throw' ? 'flex' : 'none';
   $('levelsBtn').style.display = m === 'throw' ? 'block' : 'none';
   $('customBtn').style.display = m === 'build' ? 'block' : 'none'; if (m !== 'build') cbPlacing = null;
-  clearGhost(); renderToolbar(); buildUI(); updateDetonate(); updateHud(); showHint();
+  if (m === 'throw') coach('throw');
+  clearGhost(); if (m !== 'build') stopPlacing(); renderToolbar(); buildUI(); updateDetonate(); updateHud(); showHint();
 }
 $('mBuild').onclick = () => setMode('build');
 $('customBtn').onclick = openCustom;

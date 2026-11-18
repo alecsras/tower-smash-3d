@@ -76,5 +76,5 @@ function placeAt(sx, sy) {
   const out = [];
   for (const [x, z] of mirrorPts([[c.x, c.z]])) { const o = placeCell(c, x, z, null, out.length > 0); if (o) out.push(o); }
   if (!out.length) return;
-  pushHistory(out.length === 1 ? out[0] : out); dirty = true; snd.place(); updateHud();
+  pushHistory(out.length === 1 ? out[0] : out); dirty = true; snd.place(); updateHud(); coach('place');
 }

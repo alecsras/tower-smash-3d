@@ -12,6 +12,23 @@ function noise(dur, type, freq, vol, q) { if (!AC || muted) return; const t = AC
 function tone(f0, f1, dur, vol, type) { if (!AC || muted) return; const t = AC.currentTime; const o = AC.createOscillator(); o.type = type || 'sine';
   o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + .02); }
+// layered, positional explosion: crack + body + sub + delayed debris, panned and quieter with distance
+function boomLayered(power = 1, pos) {
+  if (!AC || muted) return; const t = AC.currentTime;
+  let vol = 1, pan = 0, delay = 0;
+  if (pos && camera) { const d = camera.position.distanceTo(pos); vol = clamp(1.6 / (1 + d / 22), .15, 1.2); delay = Math.min(.25, d / 343);
+    const v = new THREE.Vector3(pos.x, pos.y, pos.z).project(camera); pan = clamp(v.x, -1, 1) * .8; }
+  const out = AC.createGain(); out.gain.value = vol * Math.min(1.6, .6 + power * .5);
+  const pn = AC.createStereoPanner ? AC.createStereoPanner() : null; if (pn) { pn.pan.value = pan; out.connect(pn); pn.connect(AC.destination); } else out.connect(AC.destination);
+  const layer = (dur, type, freq, v, q, at = 0, f1) => { const s = AC.createBufferSource(); s.buffer = NB; s.loop = true; const f = AC.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t + delay + at); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + delay + at + dur); f.Q.value = q || 1;
+    const g = AC.createGain(); g.gain.setValueAtTime(.0001, t + delay + at); g.gain.exponentialRampToValueAtTime(v, t + delay + at + .008); g.gain.exponentialRampToValueAtTime(.001, t + delay + at + dur);
+    s.connect(f); f.connect(g); g.connect(out); s.start(t + delay + at, Math.random() * .5); s.stop(t + delay + at + dur + .05); };
+  layer(.09, 'highpass', 2200, .7);                                   // crack
+  layer(.9 + power * .5, 'lowpass', 500, 1, 1, 0, 120);              // body
+  const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(90, t + delay); o.frequency.exponentialRampToValueAtTime(24, t + delay + 1 + power * .4);
+  g.gain.setValueAtTime(.9, t + delay); g.gain.exponentialRampToValueAtTime(.001, t + delay + 1.1 + power * .4); o.connect(g); g.connect(out); o.start(t + delay); o.stop(t + delay + 1.6 + power * .4);   // sub
+  for (let i = 0; i < 4; i++) layer(.07, 'bandpass', 900 + Math.random() * 1800, .25, 3, .25 + Math.random() * .7);   // debris rattle
+}
 const snd = {
   place() { noise(.07, 'lowpass', 700, .35); },
   thud(v) { noise(.13, 'lowpass', 450, .6 * v); },

@@ -57,7 +57,7 @@ function updateFire() {
     if (i++ % stride === 0) {
       const p = o.body.position, h = specHeight(o.spec) / 2;
       spawnP(p.x + rand(-.35, .35), p.y + h, p.z + rand(-.35, .35), rand(-.3, .3), rand(1.6, 3.2), rand(-.3, .3), rand(.35, .7), [1, rand(.35, .7), .08], rand(.28, .5), 1.5, -.4, .95);
-      if (Math.random() < .3) spawnP(p.x, p.y + h + .6, p.z, rand(-.4, .4), rand(1, 2), rand(-.4, .4), rand(1.4, 2.4), [.18, .17, .17], rand(.5, .8), .5, 2, .45);
+      if (Math.random() < .3) spawnSmoke(p.x, p.y + h + .4, p.z, rand(-.3, .3), rand(.8, 1.6), rand(-.3, .3), rand(2, 3.5), rand(.9, 1.5), [.16, .15, .15], .5);
     }
     if (k >= 1) {
       burning.delete(o); o.burn = null; o.charred = true; o.tint = [.22, .19, .17]; o.cdirty = true;

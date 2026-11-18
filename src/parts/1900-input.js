@@ -8,7 +8,7 @@ cv.addEventListener('pointerdown', e => {
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
   if (pointers.size === 1) {
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, orbit: false };
-    if (mode === 'build' && !cbPlacing && tool !== 'place' && tool !== 'pick') drag.tool = toolDown(e.clientX, e.clientY);
+    if (mode === 'build' && !cbPlacing && !pfPlacing && tool !== 'place' && tool !== 'pick') drag.tool = toolDown(e.clientX, e.clientY);
     if (mode === 'throw') aim = { id: e.pointerId, x: e.clientX, y: e.clientY, t0: performance.now(), target: pickTarget(e.clientX, e.clientY) };
   } else if (pointers.size === 2) {
     if (stroke) { if (stroke.brush) finishBrush(); else if (!stroke.tapAnchor) clearGhost(); }
@@ -31,6 +31,7 @@ cv.addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
   drag.cx = e.clientX; drag.cy = e.clientY;
   if (Math.hypot(drag.cx - drag.sx, drag.cy - drag.sy) > 10) drag.moved = true;
+  if (freeCam && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 10) { drag.moved = true; drag.pan = true; aim = null; if (stroke) clearGhost(); drag.tool = false; panCam(e.clientX - drag.lx, e.clientY - drag.ly); drag.lx = e.clientX; drag.ly = e.clientY; return; }
   if (drag.tool) { toolMove(drag.cx, drag.cy); drag.lx = drag.cx; drag.ly = drag.cy; return; }
   if (mode === 'build' && drag.moved) {
     drag.orbit = true;
@@ -45,9 +46,10 @@ function endPointer(e, cancel) {
   const d = drag; drag = null;
   const a = aim; aim = null;
   if (cancel) return;
+  if (d.pan) return;
   if (d.tool) { toolUp(d.moved); hideHint('build'); return; }
   if (mode === 'build' && tool === 'pick' && !d.moved) { pickAt(d.sx, d.sy); return; }
-  if (mode === 'build') { if (!d.moved) { if (cbTryPlace(d.sx, d.sy)) return; placeAt(d.sx, d.sy); hideHint('build'); } }
+  if (mode === 'build') { if (!d.moved) { if (prefabTryPlace(d.sx, d.sy)) return; if (cbTryPlace(d.sx, d.sy)) return; placeAt(d.sx, d.sy); hideHint('build'); } }
   else if (a && a.id === e.pointerId && a.vel) { throwProj(a.vel, a.target.p, chargeOf(a)); hideHint('throw'); }
 }
 cv.addEventListener('pointerup', e => endPointer(e, false));

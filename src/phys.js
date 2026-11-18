@@ -31,6 +31,7 @@ export function makePhysics(RAPIER) {
   const rbMap = new Map(), colMap = new Map();
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));
   let activeCount = 0;
+  const napList = [], NAP_V2 = .12 * .12, NAP_W2 = .3 * .3, NAP_T = .5;
 
   class PBody {
     // opts: {shape:{kind:'box'|'ball'|'cyl'|'cone'|'hull', ...}, mass?, density?, pos, quat, fric, rest, ccd, ld, ad, events}
@@ -38,7 +39,7 @@ export function makePhysics(RAPIER) {
       Object.assign(this, { fric: .55, rest: .05, ld: .01, ad: .05, ccd: false, events: true }, o);
       this.position = o.pos || new V3(); this.quaternion = o.quat || new Q4();
       this.velocity = new V3(); this.angularVelocity = new V3();
-      this.rb = null; this.userData = null; this._sleep = true;
+      this.rb = null; this.userData = null; this._sleep = true; this._calm = 0; this.nap = o.nap !== false;
       const s = this.shape;
       this.boundingRadius = s.kind === 'box' ? Math.hypot(s.hx, s.hy, s.hz) : s.kind === 'ball' ? s.r : s.kind === 'hull' ? s.radius : Math.hypot(s.r, s.hh);
       if (this.mass == null) this.mass = this.density * this.volume();
@@ -123,8 +124,15 @@ export function makePhysics(RAPIER) {
     });
     // refresh cached poses of everything that moved; anything not reported is asleep
     for (const pb of rbMap.values()) pb._sleep = true;
-    activeCount = 0;
-    world.forEachActiveRigidBody(rb => { const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true; });
+    activeCount = 0; napList.length = 0;
+    world.forEachActiveRigidBody(rb => {
+      const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true;
+      // settle-to-sleep: a body that has barely moved for NAP_T seconds stops being simulated until something touches it
+      // (piles of debris otherwise jitter awake for a long time and cost most of the physics time in big collapses)
+      if (pb.nap) { const v = pb.velocity, w = pb.angularVelocity;
+        if (v.x * v.x + v.y * v.y + v.z * v.z < NAP_V2 && w.x * w.x + w.y * w.y + w.z * w.z < NAP_W2) { if ((pb._calm += dt) > NAP_T) napList.push(pb); } else pb._calm = 0; }
+    });
+    for (const pb of napList) { pb.rb.sleep(); pb._calm = 0; pb._sleep = true; pb.velocity.set(0, 0, 0); pb.angularVelocity.set(0, 0, 0); activeCount--; }
   }
   return { world, ground, PBody, step, get activeCount() { return activeCount; }, bodies: () => rbMap.values(), setIterations(n) { world.numSolverIterations = n; } };
 }

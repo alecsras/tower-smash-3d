@@ -62,7 +62,7 @@ function updateAim() {
   const chg = $('charge');
   if (mode !== 'throw') { if (held) held.visible = false; traj.visible = marker.visible = false; chg.style.opacity = 0; return; }
   const key = curProj + curSize;
-  if (heldKey !== key) { if (held) scene.remove(held); held = makeProjMesh(curProj, PROJ[curProj].special ? .6 : Math.min(sizeF(), 1.2)); heldKey = key; scene.add(held); }
+  if (heldKey !== key) { if (held) scene.remove(held); held = makeProjMesh(curProj, PROJ[curProj].special ? .6 : Math.min(sizeF(), 1.2)); held.traverse(m => m.castShadow = false); heldKey = key; scene.add(held); }
   held.visible = true;
   const o = launchOrigin();
   { const f = new THREE.Vector3(); camera.getWorldDirection(f); const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);

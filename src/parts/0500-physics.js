@@ -36,6 +36,17 @@ function preActivate() {   // anything awake pulls nearby dormant blocks into th
     activateNear(pb.getAABB(), .25 + sp / 60 * 3);
   }
 }
+// while a collapse is still going, sleeping blocks far from anything awake leave the world too
+// (sleeping bodies still cost broadphase time and per-frame bookkeeping in very large builds)
+function deactivateCalm() {
+  const hot = new Set(); let n = 0;
+  for (const pb of P.bodies()) { n++; if (!pb.isSleeping()) forCells(pb.getAABB(), 1.5, k => hot.add(k)); }
+  if (n < 1500) return;
+  for (const pb of [...P.bodies()]) { const o = pb.userData;
+    if (!o || o.type !== 'block' || o.gone || !pb.isSleeping() || o.bonds) continue;
+    let near = false; forCells(pb.getAABB(), .3, k => { if (hot.has(k)) near = true; }); if (near) continue;
+    pb.detach(); makeDormant(o); }
+}
 function deactivateResting() {      // once everything has settled, send sleeping blocks back to dormancy
   for (const pb of [...P.bodies()]) { const o = pb.userData; if (o && o.type === 'block' && !o.gone && pb.isSleeping()) {
     if (o.bonds && o.bonds.some(b => { const q = b.a === o ? b.b : b.a; return q && !q.gone && !q.dormant && !q.body.isSleeping(); })) continue;

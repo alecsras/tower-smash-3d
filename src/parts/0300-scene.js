@@ -3,6 +3,9 @@ const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powe
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// the shadow map is redrawn only when something moved: a still 5,000-block build doesn't pay for it every frame
+renderer.shadowMap.autoUpdate = false;
+let shadowDirty = 2, shadowSafety = 0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -61,6 +64,7 @@ function setArena(r) {
   if (grid) scene.remove(grid);
   grid = new THREE.GridHelper(2 * r + 1, 2 * r + 1, 0xffffff, 0xffffff);
   grid.material.transparent = true; grid.material.opacity = .3; grid.position.y = .005; scene.add(grid);
+  shadowDirty = 2;
   const e = Math.max(26, r * 1.5 + 6); Object.assign(sun.shadow.camera, { left: -e, right: e, top: e, bottom: -e, far: 90 + e }); sun.shadow.camera.updateProjectionMatrix();
 }
 setArena(10);

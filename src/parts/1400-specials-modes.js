@@ -249,7 +249,7 @@ const nightBg = canvasTex(512, 512, (c, w, h) => {
 });
 let night = false;
 function setNight(on) {
-  night = on;
+  night = on; shadowDirty = 2;
   scene.background = on ? nightBg : dayBg; scene.fog.color.set(on ? 0x0b1530 : 0xcde8f8);
   hemi.intensity = on ? .25 : 1.1; sun.intensity = on ? .5 : 2.4; sun.color.set(on ? 0x9fb4ff : 0xfff3dc);
   MATS.glass.emissive.set(on ? 0xffc46b : 0x000000); MATS.glass.emissiveIntensity = on ? .6 : 0;

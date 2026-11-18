@@ -140,6 +140,7 @@ class Batch {
     }
     if (any) this.mesh.instanceMatrix.needsUpdate = true;
     if (anyC) ic.needsUpdate = true;
+    return any;
   }
 }
 const WHITE3 = [1, 1, 1];

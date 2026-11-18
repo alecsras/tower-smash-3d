@@ -4,6 +4,12 @@ let awakeCount = 0, lastDeact = 0;
 let last = performance.now(), hudT = 0;
 const gov = { acc: 0, n: 0, slow: 0, done: !!(navigator.webdriver) || SAVE.qmode !== 'auto' };
 let idleT = 0, skipFrame = false, fpsT = 0;
+// ?debug profiler: ms spent per section, averaged (window.__game.PROF)
+const PROF = { on: false, t: 0, sec: {}, frames: 0, worst: 0 };
+function prof(name) { if (!PROF.on) return; const n = performance.now(); if (name !== 'frame') PROF.sec[name] = (PROF.sec[name] || 0) + n - PROF.t; else PROF.t0 = n; PROF.t = n; }
+function profEnd() { if (!PROF.on) return; PROF.frames++; PROF.worst = Math.max(PROF.worst, performance.now() - PROF.t0); }
+function profReport() { const r = {}; for (const [k, v] of Object.entries(PROF.sec)) r[k] = +(v / Math.max(1, PROF.frames)).toFixed(2); r.frames = PROF.frames; r.worst = +PROF.worst.toFixed(1); return r; }
+function profReset() { PROF.sec = {}; PROF.frames = 0; PROF.worst = 0; }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) last = performance.now(); });
 function tick(now) {
   if (document.hidden) { requestAnimationFrame(tick); return; }
@@ -17,10 +23,10 @@ function tick(now) {
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
   const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
-  preActivate(); dominoAssist(); updateFields(dt);
+  prof('frame'); preActivate(); dominoAssist(); updateFields(dt); prof('pre');
   if (dt > 0) P.step(clamp(dt, 1 / 400, 1 / 40), onHit);
-  simTime += dt;
-  processFractures(); updateFire();
+  simTime += dt; prof('physics');
+  processFractures(); updateFire(); prof('fx-logic');
   // events
   if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }
   for (const o of objs) {
@@ -43,25 +49,27 @@ function tick(now) {
     if (o.meteor) { const p = o.body.position; for (let i = 0; i < 4; i++) spawnP(p.x + rand(-.3, .3), p.y + rand(-.3, .3), p.z + rand(-.3, .3), rand(-1, 1), rand(0, 2), rand(-1, 1), rand(.4, .9), i % 2 ? [1, .55, .1] : [.35, .3, .3], rand(.4, .8), 1, 2, .9); }
     if (o.bomb && !o.rocket && !o.meteor && Math.random() < .7) { const p = o.body.position; spawnP(p.x, p.y + .4, p.z, rand(-1, 1), rand(1, 3), rand(-1, 1), .35, [1, .8, .3], .12, -4, 0); }
   }
-  recordFrame();
-  objs = objs.filter(o => !o.gone || o.home);
-  for (const b of batches.values()) b.sync();
-  if (simTime - lastDeact > 1) { lastDeact = simTime; if (!P.activeCount) deactivateResting(); }
+  prof('objects'); recordFrame(); prof('replay-rec');
+  if (objsRemoved) { objsRemoved = false; objs = objs.filter(o => !o.gone || o.home); }
+  let moved = false; for (const b of batches.values()) if (b.sync()) moved = true;
+  if (moved || P.activeCount || AFX.length || fields.length) shadowDirty = 2; prof('instances');
+  if (simTime - lastDeact > 1) { lastDeact = simTime; if (!P.activeCount) deactivateResting(); else deactivateCalm(); }
   awakeCount = P.activeCount; P.setIterations(bonds.size ? (awakeCount > 2500 ? 3 : awakeCount > 800 ? 4 : 6) : awakeCount > 1500 ? 2 : awakeCount > 500 ? 3 : 4);
   if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 3.2); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
   flash.intensity *= Math.pow(.004, rawDt);
-  updateParticles(dt);
-  updateShock(rawDt); checkLevelEnd();
-  updateBonds(rawDt); updateFollow(); applyCamera(rawDt);
-  updateAim();
+  prof('deact'); updateParticles(dt); prof('particles');
+  updateShock(rawDt); checkLevelEnd(); prof('level');
+  updateBonds(rawDt); prof('bonds'); updateFollow(); applyCamera(rawDt);
+  updateAim(); prof('camera');
   grid.visible = mode === 'build';
   // nothing moving for a while: draw every other frame to save battery and heat
   const moving = P.activeCount || parts.length || smokes.length || aim || drag || pinch || AFX.length || screen !== 'game' || cam.tTarget ||
     Math.abs(cam.theta - cam.tTheta) > .001 || Math.abs(cam.r - cam.tR) > .01 || Math.abs(cam.el - cam.tEl) > .001;
   idleT = moving ? 0 : idleT + rawDt;
   if (idleT > 1.5 && (skipFrame = !skipFrame)) { if (now - hudT > 200) { hudT = now; updateHud(); } requestAnimationFrame(tick); return; }
-  renderFrame();
-  if (now - hudT > 200) { hudT = now; updateHud(); }
+  if (!PROF.noRender) renderFrame(); prof('render');
+  if (now - hudT > 200) { hudT = now; updateHud(); prof('hud'); }
+  profEnd();
   // performance governor: if frames stay slow with glow on, drop to light graphics once
   gov.acc += rawDt; gov.n++;
   if (gov.acc > 3) { const avg = gov.acc / gov.n; gov.acc = 0; gov.n = 0;

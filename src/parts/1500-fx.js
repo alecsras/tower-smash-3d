@@ -13,7 +13,9 @@ function splitBox(size, off, depth, maxDepth) {
 }
 function fracture(o) {
   if (!canFracture(o) || objs.length > 15000) return;
-  const vol = specVolume(o.spec), parts = splitBox(o.spec.d.slice(), [0, 0, 0], 0, vol > 1.5 ? 3 : 2);
+  // split into fewer, bigger chunks when thousands of bodies are already moving (same look, far less physics)
+  const vol = specVolume(o.spec), busy = P.activeCount, depth = busy > 5000 ? 1 : busy > 2500 ? (vol > 1.5 ? 2 : 1) : (vol > 1.5 ? 3 : 2);
+  const parts = splitBox(o.spec.d.slice(), [0, 0, 0], 0, depth);
   const p = o.body.position.clone(), q = o.body.quaternion.clone(), v = o.body.velocity.clone(), { tint, charred, mat } = o;
   removeObj(o);
   for (const [sz, off] of parts) {
@@ -30,7 +32,8 @@ function fracture(o) {
 }
 function processFractures() {
   let n = 0;
-  for (const o of pendingFracture) { pendingFracture.delete(o); fracture(o); if (++n >= 24) break; }
+  const cap = P.activeCount > 3000 ? 8 : P.activeCount > 1000 ? 14 : 24;   // spread big waves over a few frames
+  for (const o of pendingFracture) { pendingFracture.delete(o); fracture(o); if (++n >= cap) break; }
 }
 
 // ---- fire: wood ignites, burns, spreads, chars, crumbles ----
@@ -217,6 +220,7 @@ function applyQuality() {
   resize();
 }
 function renderFrame() {
+  if (replay || shadowDirty > 0 || ++shadowSafety > 90) { renderer.shadowMap.needsUpdate = true; if (shadowDirty > 0) shadowDirty--; shadowSafety = 0; }
   if (composer && SAVE.quality === 'high') { bloomPass.strength = night ? .95 : .5; bloomPass.threshold = night ? .6 : .86; composer.render(); }
   else renderer.render(scene, camera);
 }

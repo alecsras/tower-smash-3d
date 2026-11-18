@@ -7,7 +7,9 @@ function bootStep(p, msg) {
 function bootFail(kind) {
   const b = document.getElementById('boot'); if (!b) return;
   b.classList.add('failed');
-  document.getElementById('bootMsg').textContent = kind === 'webgl'
+  document.getElementById('bootMsg').textContent = kind === 'old'
+    ? 'This browser is too old for Tower Smash. Update to iOS 16.4 or newer, or the latest Chrome, Safari or Firefox.'
+    : kind === 'webgl'
     ? 'Tower Smash needs 3D graphics, which this browser has turned off. Try Chrome or Safari, or update your browser.'
     : 'Your browser couldn’t start the physics engine. Try Chrome or Safari, or update your browser.';
 }

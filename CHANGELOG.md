@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2 — Performance
+
+- Faster physics engine (Rapier 0.21 SIMD): about 1.8x faster on big collapses.
+- Settled blocks go to sleep sooner, and calm rubble leaves the simulation, so a 5,000-block collapse runs with about half the active objects.
+- Fracture detail scales with load, so explosions in huge builds no longer spike.
+- Shadows are only redrawn when something moves.
+- Needs iOS 16.4+ (or a current Chrome, Safari or Firefox); older browsers get a clear message.
+
 ## 0.9.0 — tester release (Nov 2026)
 - Title screen, Home (Continue, Levels, Free play, Daily, Duels), pause menu, Settings and Help center.
 - First-run intro cards, name, and the guided Training Yard; one-time tips for new features.

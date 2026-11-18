@@ -110,7 +110,7 @@ body.debug #fps{display:block}
 @media (orientation:landscape) and (max-height:520px){
   #dock{padding-top:10px}.item{flex:0 0 54px!important;min-height:52px}.item canvas{width:26px!important;height:26px!important}
   .tl{min-width:44px!important;height:40px!important}#home .logo,#title .logo{width:180px}
-  .homepanel{max-width:760px;max-height:calc(100vh - var(--top) - 60px);overflow-y:auto;padding-top:14px}.tiles{grid-template-columns:repeat(4,1fr)}
+  .homepanel{max-width:760px;max-height:calc(100dvh - var(--top) - 60px);overflow-y:auto;padding-top:14px}.tiles{grid-template-columns:repeat(4,1fr)}
   #home .logo{display:none}.tile{min-height:76px}
   #title{padding-top:calc(var(--top) + 4vh)}
   .sheet{max-height:94vh;max-width:720px}#pfGrid{grid-template-columns:repeat(5,1fr)}
@@ -131,3 +131,8 @@ body.debug #fps{display:block}
 /* sheets and results sit above the title/home screens */
 .msheet,#result{z-index:12!important}
 #dock #cats button{min-height:40px!important}
+/* iPhone: no double-tap zoom or delay on controls, no callouts on long press, real viewport height */
+button,.item,.tl,.chip,.tile,.mrow,label.tog{touch-action:manipulation;-webkit-touch-callout:none}
+.item.empty{opacity:.45;filter:grayscale(.7)}
+.item:active{transform:scale(.94)}
+@supports (height:100dvh){ .sheet{max-height:92dvh} }

@@ -2,7 +2,7 @@
 let AC = null, NB = null, MASTER = null;
 function applyVolume() { if (MASTER) MASTER.gain.value = SAVE.volume; }
 function initAudio() {
-  if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return; }
+  if (AC) { if (AC.state !== 'running') AC.resume().catch(() => {}); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
     const d = NB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     MASTER = AC.createGain(); MASTER.gain.value = SAVE.volume; MASTER.connect(AC.destination); } catch (e) { AC = null; }

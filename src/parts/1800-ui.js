@@ -77,23 +77,29 @@ function iconFor(key, forMode) {
 }
 function buildUI() {
   document.body.classList.toggle('inlevel', !!chal);
-  const tray = $('tray'); tray.innerHTML = '';
+  const tray = $('tray'), keepScroll = tray.dataset.mode === mode ? tray.scrollLeft : 0; tray.innerHTML = ''; tray.dataset.mode = mode;
   const list = mode === 'build' ? BLOCKS : PROJ, cur = mode === 'build' ? curBlock : curProj;
   const inCat = k => wcat === 'all' || (wcat === 'classic' ? !PROJ[k].special : wcat === 'power' ? PROJ[k].special && !PROJ[k].cat : PROJ[k].cat === wcat);
-  const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? (chal.pool ? Object.keys(PROJ).filter(k => !PROJ[k].special) : chal.ammo.map(a => a.kind)) : Object.keys(PROJ).filter(k => !PROJ[k].hidden && inCat(k));
+  const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? (chal.pool ? Object.keys(PROJ).filter(k => !PROJ[k].special) : [...new Set(chal.ammo.map(a => a.kind))]) : Object.keys(PROJ).filter(k => !PROJ[k].hidden && inCat(k));
   const cats = $('cats'); cats.innerHTML = ''; cats.style.display = mode === 'throw' ? 'flex' : 'none';
   if (mode === 'throw') { const rb = document.createElement('button'); rb.innerHTML = ico('RotateCcw', 's16') + (chal ? ' Restart' : ' Rebuild'); rb.setAttribute('aria-label', chal ? 'Restart level' : 'Rebuild the tower');
     rb.onclick = () => chal ? startChallenge(chal.def) : (clearFields(), lastDown = null, rebuild()); cats.appendChild(rb);
     if (!chal) { const sp = document.createElement('i'); sp.style.cssText = 'flex:0 0 1px;background:rgba(255,255,255,.35);margin:8px 2px'; cats.appendChild(sp); } }
   if (mode === 'throw' && !chal) for (const [k, lab] of WCATS) { const b = document.createElement('button'); b.textContent = lab; b.className = k === wcat ? 'on' : ''; b.onclick = () => { if (['explosive', 'elemental', 'exotic'].includes(k)) coach('arsenal'); wcat = k; const first = Object.keys(PROJ).find(q => !PROJ[q].hidden && inCat(q)); if (first && !inCat(curProj)) curProj = first; buildUI(); $('tray').scrollLeft = 0; }; cats.appendChild(b); }
   for (const key of keys) {
-    const am = chal && mode === 'throw' ? chal.ammo.find(a => a.kind === key) : null;
+    const ams = chal && mode === 'throw' && !chal.pool ? chal.ammo.filter(a => a.kind === key) : [], am = ams.find(a => a.n > 0) || ams[0] || null, amN = ams.reduce((s, a) => s + a.n, 0);
     const locked = mode === 'throw' && isLocked(key), pooled = mode === 'throw' && chal && chal.pool;
-    const b = document.createElement('button'); b.className = 'item' + (key === cur ? ' on' : '') + ((am && !am.n) || (pooled && !chal.pool.n) ? ' empty' : '') + (mode === 'throw' && PROJ[key].special ? ' sp' : '') + (locked ? ' locked' : '');
-    b.appendChild(iconFor(key)); const l = document.createElement('span'); l.textContent = locked ? `🔒 ${PRICES[key]}` : list[key].label + (am ? ` ×${am.n}` : ''); b.appendChild(l);
-    b.onclick = () => { if (locked) { openShop(); return; } if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; coach('pick:' + key); } buildUI(); };
+    const b = document.createElement('button'); b.className = 'item' + (key === cur ? ' on' : '') + ((am && !amN) || (pooled && !chal.pool.n) ? ' empty' : '') + (mode === 'throw' && PROJ[key].special ? ' sp' : '') + (locked ? ' locked' : '');
+    b.appendChild(iconFor(key)); const l = document.createElement('span'); l.textContent = locked ? `🔒 ${PRICES[key]}` : list[key].label + (am ? ` ×${amN}` : ''); b.appendChild(l);
+    b.onclick = () => {
+      if (locked) { openShop(); return; }
+      if (am && !amN) { toast(`No ${list[key].label.toLowerCase()} left — pick another`, 'warn'); return; }
+      if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; coach('pick:' + key); logAct('pick ' + key); }
+      buildUI();
+    };
     tray.appendChild(b);
   }
+  tray.scrollLeft = keepScroll;
   if (mode === 'throw') { const hideSize = (!!chal && !chal.pool) || PROJ[curProj].special; $('sizebar').style.display = hideSize ? 'none' : 'flex'; [...$('sizebar').children].forEach((c, j) => c.classList.toggle('on', j === curSize)); }
   if (mode === 'throw' && !chal && screen === 'game') tipOnce('cats', 'Weapons come in types — tap Explosive, Elemental or Exotic above the tray to find them.');
 }

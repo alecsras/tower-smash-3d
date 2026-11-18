@@ -22,6 +22,7 @@ function goHome() {
   closeAllSheets(); paused = false; endCoach(); training = false; stopPlacing();
   if (chal) { chal = null; $('result').classList.remove('open'); }
   if (duelBuild) duelBuild = null;
+  clearFields(); for (const o of objs.filter(q => q.type === 'proj' && !q.gone)) removeObj(o);   // nothing keeps exploding behind Home
   if (sceneIsFree) autosaveFree();
   if (mode !== 'build') setMode('build');
   showScreen('home');
@@ -319,3 +320,8 @@ if (DEBUG) document.body.classList.add('debug');
 // Escape / back closes the top-most sheet
 addEventListener('keydown', e => { if (e.key !== 'Escape') return; const open = [...document.querySelectorAll('.msheet.open,.dialog.open')].pop(); if (open) { open.classList.remove('open'); if (open.id === 'pause') paused = false; } else if (screen === 'game') openPause(); });
 let fpsAvg = 0;
+// iPhone: unlock sound on the first touch anywhere, and resume it after calls or app switches
+document.addEventListener('pointerdown', () => initAudio(), { capture: true, passive: true });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && AC && AC.state !== 'running') AC.resume().catch(() => {}); });
+// iPhone can drop the 3D context under memory pressure: recover by reloading instead of showing a frozen screen
+$('c').addEventListener('webglcontextlost', e => { e.preventDefault(); logAct('webgl context lost'); autosaveFree(); toast('Graphics reset — reloading…', 'warn'); setTimeout(() => location.reload(), 1200); });

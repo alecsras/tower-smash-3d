@@ -35,7 +35,9 @@ function solveVelocity(from, to, v) {
   return { vel: new THREE.Vector3(dx / D * v * Math.cos(th), v * Math.sin(th), dz / D * v * Math.cos(th)), reach };
 }
 function throwProj(vel, target, pw = 1) {
-  if (!useAmmo()) { toast('Out of ammo — tap ↺ to retry'); return; }
+  const ok = useAmmo();
+  if (ok === false && chal && !chal.ammo.some(q => q.n > 0) && !(chal.pool && chal.pool.n > 0)) toast('Out of shots — tap Restart to try again', 'warn');
+  if (!ok) return;
   coach('shoot'); const nBefore = objs.length;
   throwProj0(vel, target, pw);
   const o = objs.slice(nBefore).find(q => q.type === 'proj'); if (o) followShot(o); else { if (followOn && !homeTarget && mode === 'throw') homeTarget = cam.target.clone(); followBoom(target); }

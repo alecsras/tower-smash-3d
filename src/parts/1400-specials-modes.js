@@ -386,12 +386,20 @@ const ammoLeft = () => !chal ? Infinity : chal.pool ? chal.pool.n : chal.ammo.re
 const ammoTotal = () => !chal ? 0 : chal.pool ? chal.def.pool.n : chal.def.ammo.reduce((n, a) => n + a[2], 0);
 function useAmmo() {
   if (!chal) { if (isLocked(curProj)) { openShop(); return false; } return true; }
-  if (chal.shown) return false;
+  if (chal.shown || chal.endAt) return null;
   if (chal.pool) { if (chal.pool.n <= 0) return false; chal.pool.n--; }
   else {
-    const a = chal.ammo.find(a => a.kind === curProj && a.n > 0); if (!a) return false;
-    a.n--;
-    if (!a.n) { const nx = chal.ammo.find(q => q.n > 0); if (nx) { curProj = nx.kind; curSize = nx.size; } }
+    let a = chal.ammo.find(a => a.kind === curProj && a.n > 0);
+    if (!a) {   // the selected weapon is empty: switch to what's left instead of failing the throw
+      a = chal.ammo.find(q => q.n > 0); if (!a) return false;
+      curProj = a.kind; curSize = a.size; buildUI(); toast(`Switched to ${PROJ[a.kind].label}`); return false;
+    }
+    curSize = a.size; a.n--;
+    if (!chal.ammo.some(q => q.kind === curProj && q.n > 0)) {
+      const nx = chal.ammo.find(q => q.n > 0);
+      if (nx) { const was = PROJ[curProj].label; curProj = nx.kind; curSize = nx.size; setTimeout(() => toast(`Out of ${was.toLowerCase()}s — next up: ${PROJ[nx.kind].label}`), 400); }
+    }
+    buildUI();
   }
   chal.shots++;
   if (!ammoLeft()) chal.endAt = simTime + 4;

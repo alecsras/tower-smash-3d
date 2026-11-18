@@ -1,0 +1,60 @@
+// ================= main loop =================
+const STEP = 1 / 60;
+let awakeCount = 0, lastDeact = 0;
+let last = performance.now(), hudT = 0;
+const gov = { acc: 0, n: 0, slow: 0, done: !!(navigator.webdriver) };
+function tick(now) {
+  const rawDt = Math.min(.05, (now - last) / 1000); last = now;
+  if (replay) {
+    updateReplay(rawDt); updateParticles(rawDt * .55);
+    if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 1.8); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
+    flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
+  }
+  const dt = rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
+  preActivate(); dominoAssist(); updateFields(dt);
+  if (dt > 0) P.step(clamp(dt, 1 / 400, 1 / 40), onHit);
+  simTime += dt;
+  processFractures(); updateFire();
+  // events
+  if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }
+  for (const o of objs) {
+    if (o.gone || o.type !== 'proj') continue;
+    if (arsenalTick(o)) continue;
+    const age = simTime - o.born, due = o.fuse && simTime >= o.fuse;
+    if (o.cluster && (due || age > .9)) { splitCluster(o); continue; }
+    if (o.hole && (due || age > 1.8)) { spawnHole(o); continue; }
+    if (o.bomb && (due || age > (o.life || (o.rocket ? 3.5 : 4.5)))) explode(o, o.power || 1);
+  }
+  if (pendingBoom.length) { const due = pendingBoom.filter(b => simTime >= b.t); pendingBoom = pendingBoom.filter(b => simTime < b.t); due.forEach(b => explode(b.o, 1.15)); }
+  for (const o of objs) {
+    if (o.gone) continue;
+    if (o.type === 'shard' && simTime - o.born > 4) { removeObj(o); continue; }
+    if (o.body.position.y < -30) { removeObj(o); continue; }
+    syncMesh(o);
+    if (o.pop) { o.pop = Math.max(0, o.pop - rawDt * 7); o.mdirty = true; }
+    if (o.rocket) { const v = o.body.velocity, l = v.length() || 1, p = o.body.position; if (l > .5) o.mesh.quaternion.setFromUnitVectors(UPY, new THREE.Vector3(v.x / l, v.y / l, v.z / l));
+      for (let i = 0; i < 3; i++) spawnP(p.x - v.x / l * .55, p.y - v.y / l * .55, p.z - v.z / l * .55, -v.x * .08 + rand(-1, 1), -v.y * .08 + rand(-1, 1), -v.z * .08 + rand(-1, 1), rand(.25, .5), [1, rand(.5, .9), .2], rand(.2, .35), 0, 1.5); }
+    if (o.meteor) { const p = o.body.position; for (let i = 0; i < 4; i++) spawnP(p.x + rand(-.3, .3), p.y + rand(-.3, .3), p.z + rand(-.3, .3), rand(-1, 1), rand(0, 2), rand(-1, 1), rand(.4, .9), i % 2 ? [1, .55, .1] : [.35, .3, .3], rand(.4, .8), 1, 2, .9); }
+    if (o.bomb && !o.rocket && !o.meteor && Math.random() < .7) { const p = o.body.position; spawnP(p.x, p.y + .4, p.z, rand(-1, 1), rand(1, 3), rand(-1, 1), .35, [1, .8, .3], .12, -4, 0); }
+  }
+  recordFrame();
+  objs = objs.filter(o => !o.gone || o.home);
+  for (const b of batches.values()) b.sync();
+  if (simTime - lastDeact > 1) { lastDeact = simTime; if (!P.activeCount) deactivateResting(); }
+  awakeCount = P.activeCount; P.setIterations(awakeCount > 1500 ? 2 : awakeCount > 500 ? 3 : 4);
+  if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 3.2); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
+  flash.intensity *= Math.pow(.004, rawDt);
+  updateParticles(dt);
+  updateShock(rawDt); checkLevelEnd();
+  applyCamera(rawDt);
+  updateAim();
+  grid.visible = mode === 'build';
+  renderFrame();
+  if (now - hudT > 200) { hudT = now; updateHud(); }
+  // performance governor: if frames stay slow with glow on, drop to light graphics once
+  gov.acc += rawDt; gov.n++;
+  if (gov.acc > 3) { const avg = gov.acc / gov.n; gov.acc = 0; gov.n = 0;
+    if (avg > .034 && SAVE.quality === 'high' && !gov.done && !replay) { gov.slow++; if (gov.slow >= 2) { gov.done = true; SAVE.quality = 'low'; persist(); applyQuality(); toast('⚡ Switched to light graphics to keep things smooth'); } } else gov.slow = 0; }
+  requestAnimationFrame(tick);
+}
+

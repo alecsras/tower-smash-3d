@@ -35,7 +35,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 #hud{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--top) + 56px);background:rgba(18,28,48,.6);color:#fff;font-weight:800;font-size:14px;padding:6px 12px;border-radius:999px;z-index:2;pointer-events:none;white-space:nowrap;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 #hint{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);color:#fff;font-weight:800;font-size:18px;text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.45);pointer-events:none;z-index:2;transition:opacity .4s;width:80%;line-height:1.35}
 #toast{position:fixed;left:50%;top:calc(var(--top) + 96px);transform:translateX(-50%);background:#18263f;color:#fff;font-weight:700;font-size:14px;padding:8px 14px;border-radius:12px;z-index:3;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
-#rotL,#rotR{position:fixed;bottom:calc(var(--bot) + 92px);z-index:2;width:44px;height:44px;font-size:18px;line-height:44px}
+#rotL,#rotR{position:fixed;bottom:calc(var(--bot) + 178px);z-index:2;width:44px;height:44px;font-size:18px;line-height:44px}
 #rotL{left:10px}#rotR{right:10px}
 #power{position:fixed;left:50%;bottom:calc(var(--bot) + 100px);transform:translateX(-50%);color:#fff;font-weight:900;font-size:22px;text-shadow:0 2px 6px rgba(0,0,0,.5);opacity:0;pointer-events:none;z-index:2}
 #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:#fff;background:#18263f;font-weight:700;z-index:9}
@@ -54,6 +54,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 .card.mega{background:linear-gradient(160deg,#fff 60%,#ffe9d6)}
 #sizebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--bot) + 96px);display:none;gap:4px;background:rgba(18,28,48,.6);padding:4px;border-radius:999px;z-index:2;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 #sizebar::before{content:'Size';color:#fff;font-weight:800;font-size:12px;align-self:center;padding:0 6px 0 8px}
+#toolbar,#cats{position:fixed;left:0;right:0;bottom:calc(var(--bot) + 92px);display:none;gap:4px;padding:0 8px;overflow-x:auto;z-index:2;scrollbar-width:none;justify-content:safe center}
+#toolbar::-webkit-scrollbar,#cats::-webkit-scrollbar{display:none}
+#toolbar i{flex:0 0 1px;background:rgba(255,255,255,.4);margin:6px 2px}
+.tl{flex:0 0 auto;border:0;background:rgba(18,28,48,.62);color:#fff;border-radius:12px;min-width:46px;height:44px;padding:3px 6px;font:700 17px/1 inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.tl small{font-size:9.5px;font-weight:800;opacity:.85}
+.tl.on{background:#ff7a1a;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
+#cats{bottom:calc(var(--bot) + 136px)}
+body.calm #whiteout{display:none}
+.shophead{font-weight:800;font-size:13px;color:#5a6478;margin:12px 4px 4px;text-transform:uppercase;letter-spacing:.04em}
+#news .dcard{cursor:default}
+#detBtn{position:fixed;right:10px;bottom:calc(var(--bot) + 228px);display:none;z-index:3;border:0;border-radius:999px;background:#d8312a;color:#fff;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#cats button{flex:0 0 auto;border:0;background:rgba(18,28,48,.62);color:#fff;border-radius:999px;padding:6px 11px;font:800 12px/1 inherit;font-family:inherit;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#cats button.on{background:#fff;color:#18263f}
+.item .em{font-size:27px;line-height:34px;height:34px}
 #sizebar button{border:0;background:transparent;color:#fff;font:800 14px/1 inherit;font-family:inherit;width:38px;height:32px;border-radius:999px}
 #sizebar button.on{background:#ffcf3f;color:#18263f}
 #charge{position:fixed;width:84px;height:84px;margin:-42px 0 0 -42px;z-index:3;pointer-events:none;opacity:0;transition:opacity .12s}
@@ -111,12 +125,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8cc0ea;font-family:sy
 #coinBtn{position:fixed;right:10px;top:calc(var(--top) + 100px);z-index:2;border:0;background:rgba(18,28,48,.6);color:#ffd36b;font:800 13px/1 inherit;font-family:inherit;padding:8px 11px;border-radius:999px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .pop.coin{color:#ffd36b;font-size:16px;top:calc(var(--top) + 130px)}
 #hud.over{background:rgba(200,40,30,.8)}
-#replayBtn{position:fixed;left:10px;bottom:calc(var(--bot) + 146px);z-index:2;border:0;width:46px;height:46px;border-radius:50%;background:#18263f;color:#fff;font-size:20px;display:none;box-shadow:0 3px 12px rgba(0,0,0,.3)}
+#replayBtn{position:fixed;left:10px;bottom:calc(var(--bot) + 232px);z-index:2;border:0;width:46px;height:46px;border-radius:50%;background:#18263f;color:#fff;font-size:20px;display:none;box-shadow:0 3px 12px rgba(0,0,0,.3)}
 #replayBtn.show{display:block;animation:pulse 2s infinite}@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,122,26,.35)}}
-#replayMenu{position:fixed;left:64px;bottom:calc(var(--bot) + 146px);z-index:3;display:none;flex-direction:column;gap:6px}
+#replayMenu{position:fixed;left:64px;bottom:calc(var(--bot) + 232px);z-index:3;display:none;flex-direction:column;gap:6px}
 #replayMenu.open{display:flex}#replayMenu button{border:0;background:#fff;color:#18263f;font:800 14px/1 inherit;font-family:inherit;padding:11px 14px;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,.25);text-align:left}
 #replayUI{display:none}body.replaying #replayUI{display:block}
-body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #sizebar,body.replaying #rotL,body.replaying #rotR,body.replaying #levelsBtn,body.replaying #nightBtn,body.replaying #coinBtn,body.replaying #hint,body.replaying #customBtn,body.replaying #duelBtn{visibility:hidden}
+body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #sizebar,body.replaying #rotL,body.replaying #rotR,body.replaying #toolbar,body.replaying #detBtn,body.replaying #cats,body.replaying #levelsBtn,body.replaying #nightBtn,body.replaying #coinBtn,body.replaying #hint,body.replaying #customBtn,body.replaying #duelBtn{visibility:hidden}
 .lb{position:fixed;left:0;right:0;height:9vh;background:#000;z-index:4;animation:lbin .4s ease-out}.lb.top{top:0}.lb.bot{bottom:0}@keyframes lbin{from{height:0}}
 #replayTag{position:fixed;top:calc(9vh + 12px);left:14px;z-index:4;color:#ff3b30;font-weight:900;font-size:14px;letter-spacing:2px;animation:blink 1s infinite}@keyframes blink{50%{opacity:.35}}
 #replayTrack{position:fixed;left:20px;right:20px;bottom:calc(9vh + 12px);height:4px;background:rgba(255,255,255,.25);border-radius:4px;z-index:4}#replayBar{height:100%;width:0;background:#ff7a1a;border-radius:4px}
@@ -153,7 +167,7 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
 <div id="toast"></div>
 <div id="tray"></div>
 <button class="ib" id="rotL" aria-label="Rotate view left">◀</button><button class="ib" id="rotR" aria-label="Rotate view right">▶</button>
-<div id="sizebar"></div>
+<div id="sizebar"></div><div id="toolbar"></div><button id="detBtn" class="pill">💥 Detonate</button><div id="cats"></div>
 <div id="charge"><div class="ring"></div><span id="chargeTxt"></span></div>
 <button id="customBtn">📐 Custom</button>
 <button id="levelsBtn">🏆 Levels</button>
@@ -167,6 +181,7 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
   <p class="shopnote">Earn 🪙 by smashing (1 per 6 blocks), popping Blorbs, beating levels and playing the daily.</p>
   <div id="shopList"></div>
   <label class="tog"><input type="checkbox" id="sandboxChk"><span><b>Sandbox mode</b><small>Unlock every weapon — no grinding</small></span></label>
+  <label class="tog"><input type="checkbox" id="calmChk"><span><b>Reduce motion</b><small>No screen shake or flashes</small></span></label>
   <label class="tog"><input type="checkbox" id="qualityChk"><span><b>High-quality graphics</b><small>Glow on fire, explosions & night windows (heavier on phones)</small></span></label></div></div>
 <div id="duel" class="msheet"><div class="sheet"><div class="mh">⚔️ Build vs Smash <button id="duelX" aria-label="Close">✕</button></div>
   <div id="duelPanes" data-pane="home">
@@ -193,6 +208,12 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
   </div></div></div></div>
 <button id="nightBtn" aria-label="Night mode">🌙</button>
 <div id="whiteout"></div>
+<div id="news" class="msheet"><div class="sheet"><div class="mh">✨ What's new <button id="newsX" aria-label="Close">✕</button></div>
+  <div class="dgrid"><div class="dcard"><span>📏</span><b>Build tools</b><small>Drag to build lines, filled boxes or hollow walls up to 12 layers high. Erase, paint and copy blocks by swiping. Mirror builds both halves at once. Undo and redo everything.</small></div>
+  <div class="dcard"><span>🧱</span><b>New pieces &amp; materials</b><small>Steel, brick, ice, rubber, crystal and obsidian, plus girders, beams, slabs, half blocks, ridges and drums. Each one feels different: ice slides, rubber bounces, crystal shatters.</small></div>
+  <div class="dcard"><span>💥</span><b>30 new weapons</b><small>Railgun, drill, wrecking ball, sticky bombs, remote C4, carpet bomber, lightning, tidal wave, volcano, laser satellite, antimatter… and a piano. Filter them by type above the tray.</small></div>
+  <div class="dcard"><span>🎯</span><b>Smoother play</b><small>Tap 🎯 to frame your build. Shockwave rings and scorch marks on every blast. Reduce motion in the 🪙 menu.</small></div></div>
+  <button id="newsGo" class="b1" style="width:100%;margin-top:12px">Let's smash</button></div></div>
 <div id="disasters" class="msheet"><div class="sheet"><div class="mh">🌪 Disasters <button id="dX" aria-label="Close">✕</button></div>
   <div class="dgrid"><button id="dQuake" class="dcard"><span>🌍</span><b>Earthquake</b><small>The ground shakes for 5 seconds — tall towers sway and crumble</small></button>
   <button id="dTornado" class="dcard"><span>🌪️</span><b>Tornado</b><small>A twister wanders across the pad, lifting and flinging blocks</small></button>

@@ -25,6 +25,22 @@ Install it on a phone: open the link, then choose **Share → Add to Home Screen
 - **Challenge mode:** 10 levels with limited ammo and 1–3 stars, with progress saved in localStorage.
 - **Extras:** night mode, slow-mo, combo pop-ups, rebuild, undo, glass that shatters, TNT chain reactions.
 
+## Builder tools
+- **Place, Line, Box, Walls**: drag (or tap two points) to build lines, filled boxes or hollow walls, 1–12 layers high, with a green ghost preview.
+- **Erase, Paint, Pick**: swipe to remove or repaint blocks; tap to copy a block's piece and material.
+- **Mirror** copies everything across the middle. **Undo/redo** covers every action.
+- New materials (steel, brick, ice, rubber, crystal, obsidian), each with its own weight, friction and bounce, plus girders, beams, slabs, half blocks, ridges and drums.
+
+## Arsenal
+30 weapons on top of the originals, filterable by type:
+- **Kinetic**: wrecking ball, battering ram, shotgun, minigun, railgun, drill, spike ball, grapple hook.
+- **Explosive**: grenade, sticky bomb, remote C4, shaped charge, bunker buster, carpet bomber, fireworks, dynamite.
+- **Elemental**: lightning, freeze ray, acid rain, flamethrower, lava bomb, tidal wave, volcano.
+- **Exotic**: gravity flip, shrink ray, magnet, laser satellite, antimatter.
+- **Silly**: piano drop, duck swarm.
+
+Explosions now leave shockwave rings and scorch marks, and come in fire, plasma, spark and toxic styles.
+
 ## Modes
 - **⚔️ Build vs Smash duels:** build a fortress on a block budget (TNT costs 5) and send a link or code. Your friend gets 3 shots, and their best score travels with the link when they send it on.
 - **🏆 Campaign:** 50 generated levels, with a boss every 10th level. Pop every 🟢 Blorb hiding in and on the structures. Stars depend on how many shots you have left.
@@ -62,7 +78,7 @@ npm run serve      # optional local server
 
 | File | What it is |
 |---|---|
-| `src/main.js` | Game: scene, pieces, presets, custom/AI builder, weapons, disasters, fire and fracture, replay, campaign, duels, shop, UI, input, sound |
+| `src/parts/*.js` | The game, split by area and joined in name order at build time (one shared scope): scene, materials, physics, building, builder tools, presets, custom/AI builder, throwing, specials, arsenal, fx, loop, UI, input, sound |
 | `public/` | PWA manifest, service worker (offline), icons. These are copied into `dist/` |
 | `.github/workflows/pages.yml` | Builds and deploys to GitHub Pages on every push |
 | `src/phys.js` | Rapier wrapper (`PBody`), cached poses, collision events, dormancy support |

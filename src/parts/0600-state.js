@@ -9,6 +9,7 @@ const hintDone = { build: false, throw: false };
 function addObj(o) { o.createdT = simTime; o.body.userData = o; if (o.dormant) makeDormant(o); else o.body.attach(false); if (o.mesh) scene.add(o.mesh); else batchFor(o.spec).add(o); objs.push(o); return o; }
 function removeObj(o) {
   if (o.gone) return; o.gone = true;
+  if (o.bonds) bondsOfGone(o);
   recRemove(o); burning.delete(o);
   if (o.dormant) unDormant(o); else o.body.detach(); if (o.mesh) scene.remove(o.mesh); else if (o.batch) o.batch.remove(o);
 }

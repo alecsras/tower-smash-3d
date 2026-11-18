@@ -315,12 +315,14 @@ function takeSnapshot() {
   const blocks = objs.filter(o => o.type === 'block');
   snapshot = blocks.map(o => ({ spec: o.spec, p: o.body.position.clone(), q: o.body.quaternion.clone() }));
   blocks.forEach(o => o.home = { p: o.body.position.clone(), q: o.body.quaternion.clone() });
+  snapshot.bonds = bondsFor(blocks);
   dirty = false;
 }
 function rebuild() {
   if (!snapshot || !snapshot.length) { toast('Nothing to rebuild yet'); return; }
   clearAll();
-  for (const s of snapshot) { const o = createPiece(s.spec, s.p.x, s.p.y, s.p.z, s.q, true); o.home = { p: s.p.clone(), q: s.q.clone() }; }
+  const made = snapshot.map(s => { const o = createPiece(s.spec, s.p.x, s.p.y, s.p.z, s.q, true); o.home = { p: s.p.clone(), q: s.q.clone() }; return o; });
+  restoreBonds(made, snapshot.bonds);
   dirty = false; updateHud(); toast('Rebuilt');
 }
 // preset menu

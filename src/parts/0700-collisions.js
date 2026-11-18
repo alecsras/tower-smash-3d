@@ -40,6 +40,7 @@ function handleHit(o, other, impact) {
   if (other && other.userData && other.userData.spike && canFracture(o)) pendingFracture.add(o);
   if ((o.breakable && eff > (BRITTLE[o.mat] || 7)) || (o.tnt && eff > 6)) pendingBreak.add(o);
   if (o.type === 'blorb' && eff > 4.5) o.hitHard = true;
+  if (o.bonds) bondHitCheck(o, eff);
   if (canFracture(o) && eff > (o.charred ? 5 : FRACT[o.mat])) pendingFracture.add(o);
   if (o.type === 'proj' && impact > 9 && performance.now() - lastBuzz > 120) { lastBuzz = performance.now(); try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
   if (impact > 2.5 && o.type !== 'shard') {
@@ -84,6 +85,7 @@ function explode(o, power = 1) {
 }
 function explodeAt(c, power = 1, style) {
   const R = 5 * power, K = 26 * power;
+  bondBlast(c, R);
   for (const q of objs) {
     if (q.gone) continue;
     const qp = q.body.position, dist = Math.hypot(qp.x - c.x, qp.y - c.y, qp.z - c.z) || .01;

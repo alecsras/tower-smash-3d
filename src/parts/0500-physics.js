@@ -21,7 +21,7 @@ function unDormant(o) {
   for (const k of o.cells) { const st = dormant.get(k); if (st) { st.delete(o); if (!st.size) dormant.delete(k); } }
   o.cells = null; o.dormant = false;
 }
-function activate(o) { if (!o.dormant || o.gone) return; unDormant(o); o.body.attach(true); }   // joins asleep
+function activate(o) { if (!o.dormant || o.gone) return; unDormant(o); o.body.attach(true); if (o.bonds) wakeBonded(o); }   // joins asleep
 function activateNear(aabb, pad) {
   const found = new Set();
   forCells(aabb, pad, k => { const st = dormant.get(k); if (st) for (const o of st) if (overlap(aabb, o.aabb, pad)) found.add(o); });
@@ -31,11 +31,14 @@ function preActivate() {   // anything awake pulls nearby dormant blocks into th
   if (!dormant.size) return;
   for (const pb of [...P.bodies()]) {
     if (pb.isSleeping()) continue;
+    if (pb.userData && pb.userData.bonds) wakeBonded(pb.userData);
     const sp = pb.velocity.length() + pb.angularVelocity.length() * pb.boundingRadius;
     activateNear(pb.getAABB(), .25 + sp / 60 * 3);
   }
 }
 function deactivateResting() {      // once everything has settled, send sleeping blocks back to dormancy
-  for (const pb of [...P.bodies()]) { const o = pb.userData; if (o && o.type === 'block' && !o.gone && pb.isSleeping()) { pb.detach(); makeDormant(o); } }
+  for (const pb of [...P.bodies()]) { const o = pb.userData; if (o && o.type === 'block' && !o.gone && pb.isSleeping()) {
+    if (o.bonds && o.bonds.some(b => { const q = b.a === o ? b.b : b.a; return q && !q.gone && !q.dormant && !q.body.isSleeping(); })) continue;
+    if (o.bonds) dropJointsOf(o); pb.detach(); makeDormant(o); } }
 }
 

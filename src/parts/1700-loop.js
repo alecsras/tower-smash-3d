@@ -41,12 +41,12 @@ function tick(now) {
   objs = objs.filter(o => !o.gone || o.home);
   for (const b of batches.values()) b.sync();
   if (simTime - lastDeact > 1) { lastDeact = simTime; if (!P.activeCount) deactivateResting(); }
-  awakeCount = P.activeCount; P.setIterations(awakeCount > 1500 ? 2 : awakeCount > 500 ? 3 : 4);
+  awakeCount = P.activeCount; P.setIterations(bonds.size ? (awakeCount > 2500 ? 3 : awakeCount > 800 ? 4 : 6) : awakeCount > 1500 ? 2 : awakeCount > 500 ? 3 : 4);
   if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 3.2); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
   flash.intensity *= Math.pow(.004, rawDt);
   updateParticles(dt);
   updateShock(rawDt); checkLevelEnd();
-  updateFollow(); applyCamera(rawDt);
+  updateBonds(rawDt); updateFollow(); applyCamera(rawDt);
   updateAim();
   grid.visible = mode === 'build';
   renderFrame();

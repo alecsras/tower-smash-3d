@@ -91,15 +91,15 @@ function snapBuild(center) {
   const bl = objs.filter(o => !o.gone && o.type === 'block'); if (!bl.length) return null;
   let cx = 0, cz = 0; if (center) { for (const o of bl) { cx += o.body.position.x; cz += o.body.position.z; } cx = Math.round(cx / bl.length); cz = Math.round(cz / bl.length); }
   const p = bl.map(o => { const q = o.body.quaternion, pp = o.body.position; return [keyOf(o.spec), Math.round((pp.x - cx) * 100), Math.round((pp.y - specHeight(o.spec) / 2) * 100), Math.round((pp.z - cz) * 100), Math.round(2 * Math.atan2(q.y, q.w) * 1800 / Math.PI) / 10]; });
-  return { pal: pal.map(q => [q.s.mat, q.s.shape, q.s.d]), p };
+  return { pal: pal.map(q => [q.s.mat, q.s.shape, q.s.d]), p, b: bondsFor(bl) };
 }
-const snapPieces = (d, ox = 0, oz = 0) => d.p.map(([i, x, y, z, yaw]) => ({ spec: { mat: d.pal[i][0], shape: d.pal[i][1], d: d.pal[i][2].slice() }, x: x / 100 + ox, y: Math.max(0, y / 100), z: z / 100 + oz, rot: yaw * Math.PI / 180 }));
+const snapPieces = (d, ox = 0, oz = 0) => Object.assign(d.p.map(([i, x, y, z, yaw]) => ({ spec: { mat: d.pal[i][0], shape: d.pal[i][1], d: d.pal[i][2].slice() }, x: x / 100 + ox, y: Math.max(0, y / 100), z: z / 100 + oz, rot: yaw * Math.PI / 180 })), { bonds: d.b });
 function placePieces(ps, { replace = false } = {}) {
   if (!replace && spaceTaken(ps)) { toast('That spot is taken — try somewhere else'); return false; }
   if (replace) { clearAll(); snapshot = null; }
   let ext = 0; for (const p of ps) ext = Math.max(ext, Math.abs(p.x) + 1, Math.abs(p.z) + 1);
   if (Math.ceil(ext) > buildR) setArena(Math.min(Math.ceil(ext), 34));
-  pushHistory(ps.map(p => put(p.spec, p.x, p.y, p.z, p.rot))); dirty = true; updateHud(); return true;
+  const made = ps.map(p => put(p.spec, p.x, p.y, p.z, p.rot)); restoreBonds(made, ps.bonds); pushHistory(made); dirty = true; updateHud(); return true;
 }
 const slotKey = i => 'ts_slot_' + i;
 function readSlot(i) { try { return JSON.parse(localStorage.getItem(slotKey(i)) || 'null'); } catch (e) { return null; } }

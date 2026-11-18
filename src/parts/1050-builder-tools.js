@@ -2,7 +2,7 @@
 // tools: place (tap), line, box (filled), walls (hollow box), erase, paint, pick (eyedropper)
 const TOOLS = [
   ['place', '👆', 'Place'], ['line', '📏', 'Line'], ['box', '⬛', 'Box'], ['walls', '🔲', 'Walls'],
-  ['erase', '🧽', 'Erase'], ['paint', '🎨', 'Paint'], ['pick', '💧', 'Pick']
+  ['fuse', '🔗', 'Fuse'], ['erase', '🧽', 'Erase'], ['paint', '🎨', 'Paint'], ['pick', '💧', 'Pick']
 ];
 const HEIGHTS = [1, 2, 3, 4, 6, 8, 12];
 let tool = 'place', toolH = 0, mirrorX = false, stroke = null, redoStack = [];
@@ -84,11 +84,13 @@ function toolDown(x, y) {
     showGhost(strokePlan(stroke.a, stroke.b), stroke.a.frame);
     return true;
   }
+  if (tool === 'fuse') { stroke = { fuse: true, hit: new Set(), made: [], cut: [] }; fuseBrushAt(x, y); return true; }
   if (isBrushTool()) { stroke = { brush: [], hit: new Set() }; brushAt(x, y); return true; }
   return false;
 }
 function toolMove(x, y) {
   if (!stroke) return;
+  if (stroke.fuse) { fuseBrushAt(x, y); return; }
   if (stroke.brush) { brushAt(x, y); return; }
   const c = cellAt(x, y, false); if (!c) return;
   if (c.x === stroke.b.x && c.z === stroke.b.z) return;
@@ -96,6 +98,7 @@ function toolMove(x, y) {
 }
 function toolUp(moved) {
   if (!stroke) return;
+  if (stroke.fuse) { finishFuse(); return; }
   if (stroke.brush) { finishBrush(); return; }
   // a tap without dragging: first tap = anchor, second tap = build
   if (!moved && !stroke.tapAnchor && stroke.a.x === stroke.b.x && stroke.a.z === stroke.b.z) { stroke.tapAnchor = true; toast('Now tap (or drag to) the end point'); return; }
@@ -145,13 +148,24 @@ function pickAt(x, y) {
 }
 
 // ---- toolbar ----
-function setTool(t) { tool = t; clearGhost(); stopPlacing(); renderToolbar(); if (mode === 'build') toast(TOOL_TIPS[t]); }
+function setTool(t) { tool = t; clearGhost(); stopPlacing(); renderToolbar(); if (mode === 'build') toast(t === 'fuse' ? BOND[bondMode].tip : TOOL_TIPS[t]); }
 const TOOL_TIPS = {
   place: 'Tap to stack one piece', line: 'Drag (or tap two points) to build a line',
   box: 'Drag a rectangle to fill it', walls: 'Drag a rectangle to build hollow walls',
   erase: 'Tap or swipe blocks to remove them', paint: 'Tap or swipe blocks to repaint with the selected material',
-  pick: 'Tap a block to copy its piece and material'
+  pick: 'Tap a block to copy its piece and material',
+  fuse: 'Tap or swipe blocks to fuse them to the blocks they touch'
 };
+function fuseButtons(bar) {
+  const sep = () => bar.appendChild(document.createElement('i'));
+  sep();
+    const add = (html, lab, fn, on) => { const b = document.createElement('button'); b.className = 'tl' + (on ? ' on' : ''); b.innerHTML = html; b.setAttribute('aria-label', lab); b.onclick = fn; bar.appendChild(b); };
+    for (const k of BOND_MODES) add(`${BOND[k].emoji}<small>${BOND[k].label}</small>`, BOND[k].label, () => { bondMode = k; renderToolbar(); toast(BOND[k].tip); }, bondMode === k);
+    add('🔗<small>Fuse all</small>', 'Fuse the whole build', () => fuseAll());
+    add('💔<small>Unfuse</small>', 'Remove every bond', unfuseAll);
+    add(`👁<small>${showBonds ? 'Hide' : 'Show'}</small>`, 'Show or hide bonds', () => { showBonds = !showBonds; bondsDirty = true; renderToolbar(); });
+    sep();
+}
 function renderToolbar() {
   const bar = $('toolbar'); if (!bar) return; bar.innerHTML = '';
   bar.style.display = mode === 'build' ? 'flex' : 'none';
@@ -160,9 +174,11 @@ function renderToolbar() {
   for (const [k, ic, lab] of TOOLS) {
     const b = document.createElement('button'); b.className = 'tl' + (tool === k ? ' on' : ''); b.innerHTML = `${ic}<small>${lab}</small>`;
     b.setAttribute('aria-label', lab); b.onclick = () => setTool(k); bar.appendChild(b);
+    if (k === 'fuse' && tool === 'fuse') fuseButtons(bar);
   }
   const sep = () => { const s = document.createElement('i'); bar.appendChild(s); };
   sep();
+
   const hb = document.createElement('button'); hb.className = 'tl' + (toolH ? ' on' : ''); hb.innerHTML = `↕${HEIGHTS[toolH]}<small>Height</small>`;
   hb.setAttribute('aria-label', 'Layers per stroke'); hb.onclick = () => { toolH = (toolH + 1) % HEIGHTS.length; renderToolbar(); toast(`Lines & boxes build ${HEIGHTS[toolH]} layer${toolH ? 's' : ''} high`); };
   bar.appendChild(hb);
@@ -170,6 +186,7 @@ function renderToolbar() {
   mb.setAttribute('aria-label', 'Mirror across the middle'); mb.onclick = () => { mirrorX = !mirrorX; renderToolbar(); toast(mirrorX ? '🪞 Mirror on — builds copy across the middle' : 'Mirror off'); };
   bar.appendChild(mb);
   const rb = document.createElement('button'); rb.className = 'tl'; rb.innerHTML = `↷<small>Redo</small>`; rb.setAttribute('aria-label', 'Redo'); rb.onclick = redo; bar.appendChild(rb);
+  if (tool === 'fuse') requestAnimationFrame(() => { const f = bar.querySelector('[aria-label="Fuse"]'); if (f) bar.scrollTo({ left: f.getBoundingClientRect().left - bar.getBoundingClientRect().left + bar.scrollLeft - 8 }); });
   bar.appendChild(document.createElement('i'));
   for (const [ic, lab, fn] of [['⚖️', 'Test', testGravity], ['🏗️', 'Support', autoSupport]]) { const b = document.createElement('button'); b.className = 'tl'; b.innerHTML = `${ic}<small>${lab}</small>`; b.setAttribute('aria-label', lab); b.onclick = fn; bar.appendChild(b); }
 }

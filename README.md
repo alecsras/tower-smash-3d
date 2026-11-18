@@ -2,7 +2,7 @@
 
 A mobile-first 3D physics destruction game. Build towers block by block (or load a 5,000-block citadel), then wreck them with baseballs, anvils, nukes, black holes, earthquakes and tornadoes.
 
-**Play:** https://alecsras.github.io/tower-smash-3d/ (once GitHub Pages is on; see below). You can also open `dist/index.html` directly in a browser.
+**Play:** https://alecsras.github.io/tower-smash-3d/ · **Testers start here:** https://alecsras.github.io/tower-smash-3d/welcome.html · tester script: [docs/TESTING.md](docs/TESTING.md) · [CHANGELOG](CHANGELOG.md)
 
 Install it on a phone: open the link, then choose **Share → Add to Home Screen** (iPhone) or **⋮ → Install app** (Android). It runs fullscreen and works offline.
 
@@ -63,8 +63,8 @@ Explosions now leave shockwave rings and scorch marks, and come in fire, plasma,
 - **🎬 Instant replay:** records the last ~7 s and plays it back in slow motion with a cinematic orbiting camera. **Replay + save clip** records it to a video file.
 - **Glow:** a High-quality graphics setting (in the shop) adds glow to fire, explosions and night windows.
 
-## ✨ Describe-it builder
-In 📐 Custom, type something like "a lighthouse" or "the Eiffel Tower". Inside the Claude artifact viewer, Claude writes a blueprint in the command language below. If the blueprint breaks a physics rule, the error goes back to Claude, which fixes it once. Everywhere else, the builder falls back to a built-in library of landmarks.
+## ✨ AI Architect
+In Build › + Add › Create, type something like "a lighthouse" or "the Eiffel Tower". Inside the Claude artifact viewer, Claude writes a blueprint in the command language below. If the blueprint breaks a physics rule, the error goes back to Claude, which fixes it once. Everywhere else, the builder falls back to a built-in library of landmarks.
 
 ## GitHub Pages setup (one time)
 1. Make the repo **public**. Free GitHub Pages requires it, or a paid plan for private repos.
@@ -81,15 +81,22 @@ After that, every push to `main` builds and deploys automatically (`.github/work
 ## Develop
 ```bash
 npm install
-npm run build      # -> dist/index.html (single file, ~2.5 MB incl. the physics WASM)
-npm run serve      # optional local server
+npm run build      # -> dist/index.html (single self-contained page) + public/ files
+npm run lint       # ESLint
+npm test           # Playwright browser tests against dist/ (CHROME_PATH=/path/to/chrome to use a local Chrome)
+npm run check      # all three, as CI does
 ```
+Add `?debug` to the URL for a frame-rate counter and the `window.__game` test hooks; production pages don't expose them otherwise.
 
-| File | What it is |
+Every push runs lint, build and tests in GitHub Actions; a failing test blocks the deploy.
+
+| Path | What it is |
 |---|---|
-| `src/parts/*.js` | The game, split by area and joined in name order at build time (one shared scope): scene, materials, physics, building, builder tools, presets, custom/AI builder, throwing, specials, arsenal, fx, loop, UI, input, sound |
-| `public/` | PWA manifest, service worker (offline), icons. These are copied into `dist/` |
-| `.github/workflows/pages.yml` | Builds and deploys to GitHub Pages on every push |
+| `src/parts/*.js` | The game, split by area and joined in name order at build time (one shared scope). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| `src/styles/*.css` | Design tokens (`00`), legacy feature styles (`10`), shared components (`20`), app shell (`30`) |
+| `src/index.template.html` | Page markup; styles and the bundle are inlined at build |
 | `src/phys.js` | Rapier wrapper (`PBody`), cached poses, collision events, dormancy support |
-| `src/index.template.html` | Page shell + CSS; the bundle is inlined at `/*BUNDLE*/` |
-| `build.mjs` | esbuild → one self-contained `dist/index.html` |
+| `public/` | PWA manifest, service worker, icons, tester welcome page |
+| `tests/` | Playwright tests (boot, tools, all weapons, levels, prefabs, bonds, onboarding, menus, saves) |
+| `build.mjs` | esbuild bundle + inlined CSS and font + version stamp |
+| `docs/` | Architecture note and tester script |

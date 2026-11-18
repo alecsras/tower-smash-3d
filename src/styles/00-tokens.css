@@ -1,0 +1,19 @@
+/* ===== design tokens: every color, size and timing the interface uses ===== */
+:root{
+  --orange:#ff7a1a; --orange-d:#e5620a; --ink:#18263f; --ink-2:#3b4862; --muted:#6a7488; --cream:#f7f3ea; --cream-2:#ece6da; --line:#e2dbcd; --white:#fff;
+  --gold:#ffc93c; --success:#2fae5b; --warning:#f2a100; --danger:#d8312a; --info:#3a7bff; --violet:#7a3cff;
+  --glass:rgba(18,38,63,.62); --glass-2:rgba(18,38,63,.78); --blur:blur(8px);
+  --font:'Nunito',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --t12:12px; --t14:14px; --t16:16px; --t20:20px; --t28:28px; --t40:40px;
+  --s4:4px; --s8:8px; --s12:12px; --s16:16px; --s24:24px; --s32:32px;
+  --r10:10px; --r16:16px; --r24:24px; --pill:999px;
+  --tap:44px; --tap-l:52px;
+  --fast:150ms; --mid:250ms; --slow:400ms; --ease:cubic-bezier(.2,.8,.2,1);
+  --shadow:0 2px 10px rgba(16,24,40,.10); --shadow-l:0 10px 30px rgba(16,24,40,.25);
+  --dockH:150px;
+}
+html,body,button,input,textarea,select{font-family:var(--font)}
+body.calm *,body.calm *::before,body.calm *::after{animation-duration:1ms!important;transition-duration:1ms!important}
+.ico{width:20px;height:20px;display:inline-block;vertical-align:middle;flex:none}
+.ico.s16{width:16px;height:16px}.ico.s24{width:24px;height:24px}.ico.s28{width:28px;height:28px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

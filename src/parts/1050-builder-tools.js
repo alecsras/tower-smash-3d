@@ -1,8 +1,8 @@
 // ================= builder 2.0: tools, ghost preview, history =================
 // tools: place (tap), line, box (filled), walls (hollow box), erase, paint, pick (eyedropper)
 const TOOLS = [
-  ['place', '👆', 'Place'], ['line', '📏', 'Line'], ['box', '⬛', 'Box'], ['walls', '🔲', 'Walls'],
-  ['fuse', '🔗', 'Fuse'], ['erase', '🧽', 'Erase'], ['paint', '🎨', 'Paint'], ['pick', '💧', 'Pick']
+  ['place', 'MousePointerClick', 'Place'], ['line', 'Ruler', 'Line'], ['box', 'Square', 'Box'], ['walls', 'SquareDashed', 'Walls'],
+  ['fuse', 'Link', 'Fuse'], ['erase', 'Eraser', 'Erase'], ['paint', 'Paintbrush', 'Paint'], ['pick', 'Pipette', 'Pick']
 ];
 const HEIGHTS = [1, 2, 3, 4, 6, 8, 12];
 let tool = 'place', toolH = 0, mirrorX = false, stroke = null, redoStack = [];
@@ -148,7 +148,7 @@ function pickAt(x, y) {
 }
 
 // ---- toolbar ----
-function setTool(t) { tool = t; clearGhost(); stopPlacing(); renderToolbar(); if (mode === 'build') toast(t === 'fuse' ? BOND[bondMode].tip : TOOL_TIPS[t]); }
+function setTool(t) { tool = t; clearGhost(); stopPlacing(); renderToolbar(); if (mode === 'build' && tutStep < 0) toast(t === 'fuse' ? BOND[bondMode].tip : TOOL_TIPS[t]); if (t === 'fuse') tipOnce('fuse', 'Fusing bonds blocks to their neighbours so builds hold. Glue is weak, weld is strong, anchor bolts to the ground.'); }
 const TOOL_TIPS = {
   place: 'Tap to stack one piece', line: 'Drag (or tap two points) to build a line',
   box: 'Drag a rectangle to fill it', walls: 'Drag a rectangle to build hollow walls',
@@ -156,37 +156,29 @@ const TOOL_TIPS = {
   pick: 'Tap a block to copy its piece and material',
   fuse: 'Tap or swipe blocks to fuse them to the blocks they touch'
 };
+// the build dock: + Add, tools (fuse options open beside Fuse), undo, redo, more
+function tlBtn(bar, icon, label, fn, { on, cls = '', aria, html } = {}) {
+  const b = document.createElement('button'); b.className = 'tl' + (on ? ' on' : '') + (cls ? ' ' + cls : '');
+  b.innerHTML = (html || ico(icon)) + `<small>${label}</small>`; b.setAttribute('aria-label', aria || label); b.onclick = fn; bar.appendChild(b); return b;
+}
 function fuseButtons(bar) {
-  const sep = () => bar.appendChild(document.createElement('i'));
-  sep();
-    const add = (html, lab, fn, on) => { const b = document.createElement('button'); b.className = 'tl' + (on ? ' on' : ''); b.innerHTML = html; b.setAttribute('aria-label', lab); b.onclick = fn; bar.appendChild(b); };
-    for (const k of BOND_MODES) add(`${BOND[k].emoji}<small>${BOND[k].label}</small>`, BOND[k].label, () => { bondMode = k; renderToolbar(); toast(BOND[k].tip); }, bondMode === k);
-    add('🔗<small>Fuse all</small>', 'Fuse the whole build', () => fuseAll());
-    add('💔<small>Unfuse</small>', 'Remove every bond', unfuseAll);
-    add(`👁<small>${showBonds ? 'Hide' : 'Show'}</small>`, 'Show or hide bonds', () => { showBonds = !showBonds; bondsDirty = true; renderToolbar(); });
-    sep();
+  bar.appendChild(document.createElement('i'));
+  for (const k of BOND_MODES) tlBtn(bar, null, BOND[k].label, () => { bondMode = k; renderToolbar(); toast(BOND[k].tip); }, { on: bondMode === k, html: `<span style="font-size:17px;line-height:19px">${BOND[k].emoji}</span>` });
+  tlBtn(bar, 'Link', 'Fuse all', () => fuseAll(), { aria: 'Fuse the whole build' });
+  tlBtn(bar, 'X', 'Unfuse', unfuseAll, { aria: 'Remove every bond' });
+  tlBtn(bar, showBonds ? 'EyeOff' : 'Eye', showBonds ? 'Hide' : 'Show', () => { showBonds = !showBonds; bondsDirty = true; renderToolbar(); }, { aria: 'Show or hide bonds' });
+  bar.appendChild(document.createElement('i'));
 }
 function renderToolbar() {
   const bar = $('toolbar'); if (!bar) return; bar.innerHTML = '';
   bar.style.display = mode === 'build' ? 'flex' : 'none';
-  const pf = document.createElement('button'); pf.className = 'tl'; pf.innerHTML = '🧩<small>Prefabs</small>'; pf.setAttribute('aria-label', 'Prefabs and saves'); pf.onclick = openPrefabs; bar.appendChild(pf);
-  bar.appendChild(document.createElement('i'));
-  for (const [k, ic, lab] of TOOLS) {
-    const b = document.createElement('button'); b.className = 'tl' + (tool === k ? ' on' : ''); b.innerHTML = `${ic}<small>${lab}</small>`;
-    b.setAttribute('aria-label', lab); b.onclick = () => setTool(k); bar.appendChild(b);
+  tlBtn(bar, 'Plus', 'Add', () => openLibrary(), { aria: 'Build Library: prefabs, big builds, create', cls: 'add' });
+  for (const [k, icon, lab] of TOOLS) {
+    tlBtn(bar, icon, lab, () => setTool(k), { on: tool === k });
     if (k === 'fuse' && tool === 'fuse') fuseButtons(bar);
   }
-  const sep = () => { const s = document.createElement('i'); bar.appendChild(s); };
-  sep();
-
-  const hb = document.createElement('button'); hb.className = 'tl' + (toolH ? ' on' : ''); hb.innerHTML = `↕${HEIGHTS[toolH]}<small>Height</small>`;
-  hb.setAttribute('aria-label', 'Layers per stroke'); hb.onclick = () => { toolH = (toolH + 1) % HEIGHTS.length; renderToolbar(); toast(`Lines & boxes build ${HEIGHTS[toolH]} layer${toolH ? 's' : ''} high`); };
-  bar.appendChild(hb);
-  const mb = document.createElement('button'); mb.className = 'tl' + (mirrorX ? ' on' : ''); mb.innerHTML = `🪞<small>Mirror</small>`;
-  mb.setAttribute('aria-label', 'Mirror across the middle'); mb.onclick = () => { mirrorX = !mirrorX; renderToolbar(); toast(mirrorX ? '🪞 Mirror on — builds copy across the middle' : 'Mirror off'); };
-  bar.appendChild(mb);
-  const rb = document.createElement('button'); rb.className = 'tl'; rb.innerHTML = `↷<small>Redo</small>`; rb.setAttribute('aria-label', 'Redo'); rb.onclick = redo; bar.appendChild(rb);
-  if (tool === 'fuse') requestAnimationFrame(() => { const f = bar.querySelector('[aria-label="Fuse"]'); if (f) bar.scrollTo({ left: f.getBoundingClientRect().left - bar.getBoundingClientRect().left + bar.scrollLeft - 8 }); });
   bar.appendChild(document.createElement('i'));
-  for (const [ic, lab, fn] of [['⚖️', 'Test', testGravity], ['🏗️', 'Support', autoSupport]]) { const b = document.createElement('button'); b.className = 'tl'; b.innerHTML = `${ic}<small>${lab}</small>`; b.setAttribute('aria-label', lab); b.onclick = fn; bar.appendChild(b); }
+  tlBtn(bar, 'Undo2', 'Undo', undo); tlBtn(bar, 'Redo2', 'Redo', redo);
+  tlBtn(bar, 'Ellipsis', 'More', openMore, { on: mirrorX || toolH > 0, aria: 'More build tools' });
+  if (tool === 'fuse') requestAnimationFrame(() => { const f = bar.querySelector('[aria-label="Fuse"]'); if (f) bar.scrollTo({ left: f.getBoundingClientRect().left - bar.getBoundingClientRect().left + bar.scrollLeft - 8 }); });
 }

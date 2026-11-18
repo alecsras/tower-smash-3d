@@ -1,17 +1,19 @@
 // ================= sound =================
-let AC = null, NB = null;
+let AC = null, NB = null, MASTER = null;
+function applyVolume() { if (MASTER) MASTER.gain.value = SAVE.volume; }
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
-    const d = NB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) { AC = null; }
+    const d = NB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    MASTER = AC.createGain(); MASTER.gain.value = SAVE.volume; MASTER.connect(AC.destination); } catch (e) { AC = null; }
 }
 function noise(dur, type, freq, vol, q) { if (!AC || muted) return; const t = AC.currentTime;
   const s = AC.createBufferSource(); s.buffer = NB; s.loop = dur > .45; const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 1;
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  s.connect(f); f.connect(g); g.connect(AC.destination); s.start(t, Math.random() * .5); s.stop(t + dur + .02); }
+  s.connect(f); f.connect(g); g.connect(MASTER); s.start(t, Math.random() * .5); s.stop(t + dur + .02); }
 function tone(f0, f1, dur, vol, type) { if (!AC || muted) return; const t = AC.currentTime; const o = AC.createOscillator(); o.type = type || 'sine';
   o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-  const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + .02); }
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g); g.connect(MASTER); o.start(t); o.stop(t + dur + .02); }
 // layered, positional explosion: crack + body + sub + delayed debris, panned and quieter with distance
 function boomLayered(power = 1, pos) {
   if (!AC || muted) return; const t = AC.currentTime;
@@ -19,7 +21,7 @@ function boomLayered(power = 1, pos) {
   if (pos && camera) { const d = camera.position.distanceTo(pos); vol = clamp(1.6 / (1 + d / 22), .15, 1.2); delay = Math.min(.25, d / 343);
     const v = new THREE.Vector3(pos.x, pos.y, pos.z).project(camera); pan = clamp(v.x, -1, 1) * .8; }
   const out = AC.createGain(); out.gain.value = vol * Math.min(1.6, .6 + power * .5);
-  const pn = AC.createStereoPanner ? AC.createStereoPanner() : null; if (pn) { pn.pan.value = pan; out.connect(pn); pn.connect(AC.destination); } else out.connect(AC.destination);
+  const pn = AC.createStereoPanner ? AC.createStereoPanner() : null; if (pn) { pn.pan.value = pan; out.connect(pn); pn.connect(MASTER); } else out.connect(MASTER);
   const layer = (dur, type, freq, v, q, at = 0, f1) => { const s = AC.createBufferSource(); s.buffer = NB; s.loop = true; const f = AC.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t + delay + at); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + delay + at + dur); f.Q.value = q || 1;
     const g = AC.createGain(); g.gain.setValueAtTime(.0001, t + delay + at); g.gain.exponentialRampToValueAtTime(v, t + delay + at + .008); g.gain.exponentialRampToValueAtTime(.001, t + delay + at + dur);
     s.connect(f); f.connect(g); g.connect(out); s.start(t + delay + at, Math.random() * .5); s.stop(t + delay + at + dur + .05); };

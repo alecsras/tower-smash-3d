@@ -106,7 +106,7 @@ function readSlot(i) { try { return JSON.parse(localStorage.getItem(slotKey(i)) 
 
 // ---- placing ----
 let pfPlacing = null;
-function startPlacing(p) { pfPlacing = p; closePrefabs(); if (mode !== 'build') setMode('build'); toast(`${p.emoji || '📍'} Tap the ground to drop “${p.name}”`); }
+function startPlacing(p) { pfPlacing = p; closePrefabs(); goGame(); if (chal) exitChallenge(); sceneIsFree = true; if (mode !== 'build') setMode('build'); toast(`${p.emoji || '📍'} Tap the ground to drop “${p.name}”`); }
 function prefabTryPlace(sx, sy) {
   if (!pfPlacing) return false;
   const h = rayHit(sx, sy); if (!h) return true;
@@ -122,13 +122,14 @@ function stopPlacing() { pfPlacing = null; }
 
 // ---- the sheet ----
 let pfTab = 'tower';
-function openPrefabs() { renderPrefabs(); $('prefabs').classList.add('open'); }
-function closePrefabs() { $('prefabs').classList.remove('open'); }
+function openPrefabs() { openLibrary('prefabs'); }
+function closePrefabs() { closeLibrary(); }
 function renderPrefabs() {
   const tabs = $('pfTabs'), grid = $('pfGrid'); tabs.innerHTML = ''; grid.innerHTML = '';
-  for (const [k, lab] of PREFAB_CATS) { const b = document.createElement('button'); b.textContent = lab; b.className = 'chip' + (k === pfTab ? ' on' : ''); b.onclick = () => { pfTab = k; renderPrefabs(); }; tabs.appendChild(b); }
+  if (pfTab === 'my') grid.insertAdjacentHTML('beforeend', '<div class="lab" style="grid-column:1/-1;margin-top:4px!important">My prefabs</div>');
+  for (const [k, lab] of PREFAB_CATS.filter(c => c[0] !== 'mine' && c[0] !== 'slots')) { const b = document.createElement('button'); b.textContent = lab; b.className = 'chip' + (k === pfTab ? ' on' : ''); b.onclick = () => { pfTab = k; renderPrefabs(); }; tabs.appendChild(b); }
   const card = (emoji, name, sub, on, extra) => { const c = document.createElement('button'); c.className = 'pfcard'; c.innerHTML = `<span>${emoji}</span><b>${name}</b><small>${sub}</small>`; c.onclick = on; if (extra) c.appendChild(extra); grid.appendChild(c); return c; };
-  if (pfTab === 'mine') {
+  if (pfTab === 'mine' || pfTab === 'my') {
     const mine = SAVE.myPrefabs || [];
     card('➕', 'Save my build', 'Keep what’s on the pad as a prefab', () => {
       const d = snapBuild(true); if (!d) { toast('Build something first'); return; } if (d.p.length > 4000) { toast('Too big for a prefab (max 4,000 blocks)'); return; }
@@ -137,17 +138,18 @@ function renderPrefabs() {
     });
     mine.forEach((m, i) => { const del = document.createElement('i'); del.textContent = '✕'; del.className = 'pfdel'; del.onclick = e => { e.stopPropagation(); SAVE.myPrefabs.splice(i, 1); persist(); renderPrefabs(); };
       card('⭐', m.name, `${m.n.toLocaleString()} blocks`, () => startPlacing({ name: m.name, emoji: '⭐', data: m.data }), del); });
-    $('pfNameRow').style.display = 'flex'; return;
+    $('pfNameRow').style.display = 'flex'; if (pfTab === 'mine') return;
+    grid.insertAdjacentHTML('beforeend', '<div class="lab" style="grid-column:1/-1">Save slots</div>');
   }
-  $('pfNameRow').style.display = pfTab === 'slots' ? 'flex' : 'none';
-  if (pfTab === 'slots') {
+  if (pfTab !== 'my') $('pfNameRow').style.display = pfTab === 'slots' ? 'flex' : 'none';
+  if (pfTab === 'slots' || pfTab === 'my') {
     for (let i = 1; i <= 3; i++) {
       const s = readSlot(i), row = document.createElement('div'); row.className = 'slotrow';
       row.innerHTML = `<div><b>Slot ${i}${s ? ' · ' + s.name : ''}</b><small>${s ? `${s.n.toLocaleString()} blocks · ${new Date(s.t).toLocaleDateString()}` : 'Empty'}</small></div>`;
       const sv = document.createElement('button'); sv.className = 'b2'; sv.textContent = 'Save'; sv.onclick = () => {
         const d = snapBuild(false); if (!d) { toast('Build something first'); return; }
         try { localStorage.setItem(slotKey(i), JSON.stringify({ name: ($('pfName').value || '').trim() || `Build ${i}`, t: Date.now(), n: d.p.length, data: d })); toast(`💾 Saved to slot ${i}`); } catch (e) { toast('Not enough space to save that build'); } renderPrefabs(); };
-      const ld = document.createElement('button'); ld.className = 'b1'; ld.textContent = 'Load'; ld.disabled = !s; ld.onclick = () => { if (placePieces(snapPieces(s.data), { replace: true })) { closePrefabs(); fitView(); toast(`💾 Loaded ${s.name}`); } };
+      const ld = document.createElement('button'); ld.className = 'b1'; ld.textContent = 'Load'; ld.disabled = !s; ld.onclick = () => { if (placePieces(snapPieces(s.data), { replace: true })) { closePrefabs(); goGame(); chal = null; sceneIsFree = true; fitView(); toast(`💾 Loaded ${s.name}`); } };
       row.append(sv, ld); grid.appendChild(row);
     }
     return;
@@ -191,5 +193,4 @@ function autoSupport() {
   if (!adds.length) { toast('Nothing is hanging in the air'); return; }
   adds.forEach(o => { o.pop = 1; o.mdirty = true; }); pushHistory(adds); dirty = true; updateHud(); toast(`🏗️ Added ${adds.length} support blocks`);
 }
-$('pfX').onclick = closePrefabs;
-$('prefabs').addEventListener('click', e => { if (e.target.id === 'prefabs') closePrefabs(); });
+

@@ -142,7 +142,7 @@ function renderAIEdit() {
 }
 function renderAI(f) {
   const box = document.createElement('div'); box.className = 'aibox';
-  box.innerHTML = `<div class="lab">✨ Describe it — AI builds it</div>
+  box.innerHTML = `<div class="lab">✨ AI Architect — describe any building</div>
     <div class="airow"><input id="aiIn" placeholder="e.g. the Eiffel Tower, a castle on a hill…" enterkeyhint="go"><button class="b1" id="aiGo">Build</button></div>
     <div class="chips" id="aiStyles"></div>
     <div class="airow aiopts"><label class="chk"><input type="checkbox" id="aiPrev"${aiPreview ? ' checked' : ''}> Show the plan first</label>

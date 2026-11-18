@@ -2,15 +2,21 @@
 const STEP = 1 / 60;
 let awakeCount = 0, lastDeact = 0;
 let last = performance.now(), hudT = 0;
-const gov = { acc: 0, n: 0, slow: 0, done: !!(navigator.webdriver) };
+const gov = { acc: 0, n: 0, slow: 0, done: !!(navigator.webdriver) || SAVE.qmode !== 'auto' };
+let idleT = 0, skipFrame = false, fpsT = 0;
+document.addEventListener('visibilitychange', () => { if (!document.hidden) last = performance.now(); });
 function tick(now) {
+  if (document.hidden) { requestAnimationFrame(tick); return; }
   const rawDt = Math.min(.05, (now - last) / 1000); last = now;
+  fpsAvg = fpsAvg ? fpsAvg * .95 + (1 / Math.max(rawDt, .001)) * .05 : 60;
+  if (DEBUG && (fpsT = (fpsT || 0) + rawDt) > .5) { fpsT = 0; $('fps').textContent = `${Math.round(fpsAvg)} fps · ${P.activeCount} awake · ${objs.length} obj · ${bonds.size} bonds`; }
+  if (screen !== 'game') cam.tTheta += rawDt * .07;
   if (replay) {
     updateReplay(rawDt); updateParticles(rawDt * .55);
     if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 1.8); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
-  const dt = rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
+  const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
   preActivate(); dominoAssist(); updateFields(dt);
   if (dt > 0) P.step(clamp(dt, 1 / 400, 1 / 40), onHit);
   simTime += dt;
@@ -49,6 +55,11 @@ function tick(now) {
   updateBonds(rawDt); updateFollow(); applyCamera(rawDt);
   updateAim();
   grid.visible = mode === 'build';
+  // nothing moving for a while: draw every other frame to save battery and heat
+  const moving = P.activeCount || parts.length || smokes.length || aim || drag || pinch || AFX.length || screen !== 'game' || cam.tTarget ||
+    Math.abs(cam.theta - cam.tTheta) > .001 || Math.abs(cam.r - cam.tR) > .01 || Math.abs(cam.el - cam.tEl) > .001;
+  idleT = moving ? 0 : idleT + rawDt;
+  if (idleT > 1.5 && (skipFrame = !skipFrame)) { if (now - hudT > 200) { hudT = now; updateHud(); } requestAnimationFrame(tick); return; }
   renderFrame();
   if (now - hudT > 200) { hudT = now; updateHud(); }
   // performance governor: if frames stay slow with glow on, drop to light graphics once

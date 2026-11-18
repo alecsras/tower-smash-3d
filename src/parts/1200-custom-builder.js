@@ -267,8 +267,8 @@ function cbUpdate() {
     el2.textContent = C.err ? '⚠️ ' + C.err : C.structs.length ? `${C.structs.length} structure${C.structs.length > 1 ? 's' : ''} · ${tot.toLocaleString()} blocks${tot > CB_MAX_BLOCKS ? ' — too many' : ''}` : '';
   }
 }
-function openCustom() { renderCustom(); $('custom').classList.add('open'); }
-function closeCustom() { $('custom').classList.remove('open'); }
+function openCustom() { openLibrary('create'); }
+function closeCustom() { closeLibrary(); }
 $('customX').onclick = closeCustom;
 $('custom').addEventListener('click', e => { if (e.target.id === 'custom') closeCustom(); });
 // tap-to-place: called from the build-mode tap handler

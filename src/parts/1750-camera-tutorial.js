@@ -22,36 +22,31 @@ function panCam(dx, dy) {
   cam.target.x = clamp(cam.target.x, -40, 40); cam.target.z = clamp(cam.target.z, -40, 40); cam.tTarget = null; homeTarget = null;
 }
 
-// ---- tutorial: a short coached tour, each step waits for the player to do it ----
-const TUT = [
-  { id: 'place', mode: 'build', text: '👆 Tap the sandy pad to stack a block', setup() { setTool('place'); } },
-  { id: 'line', mode: 'build', text: '📏 Now drag across the pad with the Line tool — release to build a whole wall', setup() { setTool('line'); toolH = 2; renderToolbar(); }, glow: '#toolbar .tl.on' },
-  { id: 'prefab', mode: 'build', text: '🧩 Open Prefabs and drop something on the pad', glow: '#toolbar .tl:first-child' },
-  { id: 'throw', mode: null, text: '🎯 Ready? Switch to Throw at the top', glow: '#mThrow' },
-  { id: 'shoot', mode: 'throw', text: '💥 Press and hold where you want to hit — longer = faster. Let go to throw!' },
-  { id: 'arsenal', mode: 'throw', text: '🧨 Try a weapon type — tap Explosive, Elemental or Exotic above the tray', glow: '#cats button:nth-child(5)' }
-];
-let tutStep = -1;
-function startTutorial() { tutStep = 0; SAVE.tut = false; persist(); showCoach(); }
+// ---- coach marks: a guided list of steps, each waiting for the player to do it ----
+// steps: [{id, text, mode?, setup?, glow?}] ; coach(id) advances when the matching action happens
+let TUT = [], tutStep = -1, tutDone = null;
+function runCoach(steps, onDone) { TUT = steps; tutStep = 0; tutDone = onDone; showCoach(); }
 function showCoach() {
   document.querySelectorAll('.glowhint').forEach(e => e.classList.remove('glowhint'));
   const s = TUT[tutStep]; if (!s) { $('coach').classList.remove('show'); return; }
   if (s.mode && mode !== s.mode) setMode(s.mode);
   if (s.setup) s.setup();
   hintDone.build = hintDone.throw = true; $('hint').style.opacity = 0;
-  $('coachTxt').textContent = `${s.text}  (${tutStep + 1}/${TUT.length})`; $('coach').classList.add('show');
-  if (s.glow) { const el = document.querySelector(s.glow); if (el) el.classList.add('glowhint'); }
+  $('coachTxt').textContent = `${s.text}  (${tutStep + 1}/${TUT.length})`; $('coachSkip').textContent = 'Skip';
+  $('coach').classList.remove('tip'); $('coach').classList.add('show');
+  if (s.glow) setTimeout(() => { const el = document.querySelector(s.glow); if (el) el.classList.add('glowhint'); }, 60);
 }
 function coach(ev) {
   if (tutStep < 0 || !TUT[tutStep] || TUT[tutStep].id !== ev) return;
-  snd.ding(); tutStep++;
-  if (tutStep >= TUT.length) { endTutorial(true); return; }
-  setTimeout(showCoach, 500);
+  snd.ding(); tutStep++; logAct('coach ' + ev);
+  if (tutStep >= TUT.length) { const d = tutDone; endCoach(); if (d) d(); return; }
+  setTimeout(showCoach, 450);
 }
-function endTutorial(done) {
-  tutStep = -1; SAVE.tut = true; persist(); $('coach').classList.remove('show');
+function endCoach() {
+  tutStep = -1; TUT = []; tutDone = null; $('coach').classList.remove('show', 'tip');
   document.querySelectorAll('.glowhint').forEach(e => e.classList.remove('glowhint'));
-  if (done) { toast('🎓 You’re a demolition expert now — have fun!'); addCoins(100, 'tutorial'); }
 }
-$('coachSkip').onclick = () => endTutorial(false);
-$('tutBtn').onclick = () => { $('shop').classList.remove('open'); setMode('build'); startTutorial(); };
+$('coachSkip').onclick = () => {
+  if ($('coach').classList.contains('tip')) { $('coach').classList.remove('show', 'tip'); return; }
+  const skipTraining = training; endCoach(); if (skipTraining) finishTraining(true);
+};

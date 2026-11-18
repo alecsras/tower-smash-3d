@@ -94,7 +94,7 @@ function fuseBrushAt(x, y) {
 }
 function finishFuse() {
   const s = stroke; stroke = null; if (!s.made.length && !s.cut.length) { toast(bondMode === 'anchor' ? 'Anchor only works on blocks touching the ground' : 'No touching blocks there'); return; }
-  pushBondHistory(s.made, s.cut);
+  pushBondHistory(s.made, s.cut); if (s.made.length) coach('fuse');
   toast(s.cut.length ? `✂️ Cut ${s.cut.length} bonds` : `${BOND[bondMode].emoji} +${s.made.length} ${BOND[bondMode].label.toLowerCase()} bonds`);
 }
 

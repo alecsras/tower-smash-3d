@@ -326,24 +326,20 @@ function rebuild() {
   dirty = false; updateHud(); toast('Rebuilt');
 }
 // preset menu
-function openMenu() {
+function openMenu() { openLibrary('mega'); }
+function renderMega() {
   const g = $('mgrid'); g.innerHTML = '';
-  { const b = document.createElement('button'); b.className = 'card mega custom chal'; b.innerHTML = '<span class="em">🏆</span><b>Campaign, challenges & daily</b><small>50 Blorb levels · 10 demolition challenges · a new city every day</small><i>' + (Object.values(SAVE.camp).reduce((a, b) => a + b, 0) + Object.values(loadStars()).reduce((a, b) => a + b, 0)) + ' / 180 ★</i>';
-    b.onclick = () => { closeMenu(); setTimeout(() => openLevels(), 120); }; g.appendChild(b); }
-  { const b = document.createElement('button'); b.className = 'card mega custom'; b.innerHTML = '<span class="em">📐</span><b>Custom builder</b><small>Design your own: pick shape, size (e.g. 5×5×30), material & extras — or type a blueprint</small><i>up to 12,000 blocks</i>';
-    b.onclick = () => { closeMenu(); setTimeout(openCustom, 120); }; g.appendChild(b); }
   for (const [title, list] of [['Mega builds · 500–5,000 blocks', PRESETS.filter(p => p.mega)], ['Classic builds', PRESETS.filter(p => !p.mega)]]) {
     const h = document.createElement('div'); h.className = 'sect'; h.textContent = title; g.appendChild(h);
     for (const p of list) {
       const b = document.createElement('button'); b.className = 'card' + (p.mega ? ' mega' : '');
       b.innerHTML = `<span class="em">${p.emoji}</span><b>${p.name}</b><small>${p.desc}</small><i>${countOf(p)} blocks</i>`;
-      b.onclick = () => { closeMenu(); setTimeout(() => loadPreset(p), 30); };
+      b.onclick = async () => { if (objs.some(o => !o.gone && o.type === 'block') && !(await confirmDlg(`Load ${p.name}?`, 'This replaces what’s on the pad. You can’t undo it.', 'Load'))) return; closeLibrary(); goGame(); chal = null; sceneIsFree = true; setTimeout(() => { loadPreset(p); if (mode !== 'build') setMode('build'); }, 30); };
       g.appendChild(b);
     }
   }
-  $('menu').classList.add('open');
 }
-function closeMenu() { $('menu').classList.remove('open'); }
+function closeMenu() { closeLibrary(); }
 $('menuX').onclick = closeMenu;
 $('menu').addEventListener('click', e => { if (e.target.id === 'menu') closeMenu(); });
 

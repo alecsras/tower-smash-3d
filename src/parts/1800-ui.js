@@ -15,15 +15,29 @@ function updateHud() {
   if (chal) { chal.pct = pct; hud.textContent = challengeHud(); return; }
   hud.textContent = `💥 ${down}/${homes.length} toppled · ${pct}%` + (pct === 100 ? ' 🏆' : '');
 }
-let toastT;
-function toast(msg) { const el = $('toast'); el.textContent = msg; el.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => el.style.opacity = 0, 1700); }
+// toasts: one at a time, queued; kind 'warn' stays longer and is colored
+let toastT = null, toastQ = [];
+function toast(msg, kind) {
+  if (toastQ.length && toastQ[toastQ.length - 1].msg === msg) return;
+  if (!kind && /^(Need|Too |That spot|Budget|Couldn|Out of|Nothing|No )/.test(msg)) kind = 'warn';
+  toastQ.push({ msg, kind }); if (toastQ.length > 3) toastQ.splice(0, toastQ.length - 3);
+  if (!toastT) nextToast();
+}
+function nextToast() {
+  const el = $('toast'), t = toastQ.shift();
+  if (!t) { el.classList.remove('show'); toastT = null; return; }
+  el.textContent = t.msg; el.className = 'show ' + (t.kind || ''); el.style.opacity = '';
+  logAct('toast ' + t.msg.slice(0, 50));
+  toastT = setTimeout(() => { el.classList.remove('show'); toastT = setTimeout(nextToast, 220); }, t.kind === 'warn' ? 3800 : toastQ.length ? 1600 : 2400);
+}
+// center hints show once per mode, ever; afterwards they live in Help
 function showHint() {
   $('hint').innerHTML = mode === 'build'
-    ? 'Tap to stack blocks · drag to spin the view<br><small>Tap 🏰 for castles, temples & more</small>'
-    : 'Tap where you want to hit<br><small>Hold longer = faster throw · two fingers or ◀ ▶ to move the camera</small>';
-  $('hint').style.opacity = hintDone[mode] ? 0 : 1;
+    ? 'Tap the sand to stack blocks<br><small>Drag to turn the view · + Add for prefabs and castles</small>'
+    : 'Press where you want to hit<br><small>Hold longer for a faster throw · two fingers move the camera</small>';
+  $('hint').style.opacity = hintDone[mode] || SAVE.hints[mode] || tutStep >= 0 ? 0 : 1;
 }
-function hideHint(m) { hintDone[m] = true; if (mode === m) $('hint').style.opacity = 0; }
+function hideHint(m) { hintDone[m] = true; if (!SAVE.hints[m]) { SAVE.hints[m] = 1; persist(); } if (mode === m) $('hint').style.opacity = 0; }
 
 // tray icons (2D canvas)
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
@@ -62,44 +76,36 @@ function iconFor(key, forMode) {
   return c;
 }
 function buildUI() {
+  document.body.classList.toggle('inlevel', !!chal);
   const tray = $('tray'); tray.innerHTML = '';
   const list = mode === 'build' ? BLOCKS : PROJ, cur = mode === 'build' ? curBlock : curProj;
   const inCat = k => wcat === 'all' || (wcat === 'classic' ? !PROJ[k].special : wcat === 'power' ? PROJ[k].special && !PROJ[k].cat : PROJ[k].cat === wcat);
   const keys = mode === 'build' ? Object.keys(BLOCKS) : chal ? (chal.pool ? Object.keys(PROJ).filter(k => !PROJ[k].special) : chal.ammo.map(a => a.kind)) : Object.keys(PROJ).filter(k => !PROJ[k].hidden && inCat(k));
-  const cats = $('cats'); cats.innerHTML = ''; cats.style.display = mode === 'throw' && !chal ? 'flex' : 'none';
+  const cats = $('cats'); cats.innerHTML = ''; cats.style.display = mode === 'throw' ? 'flex' : 'none';
+  if (mode === 'throw') { const rb = document.createElement('button'); rb.innerHTML = ico('RotateCcw', 's16') + (chal ? ' Restart' : ' Rebuild'); rb.setAttribute('aria-label', chal ? 'Restart level' : 'Rebuild the tower');
+    rb.onclick = () => chal ? startChallenge(chal.def) : (clearFields(), lastDown = null, rebuild()); cats.appendChild(rb);
+    if (!chal) { const sp = document.createElement('i'); sp.style.cssText = 'flex:0 0 1px;background:rgba(255,255,255,.35);margin:8px 2px'; cats.appendChild(sp); } }
   if (mode === 'throw' && !chal) for (const [k, lab] of WCATS) { const b = document.createElement('button'); b.textContent = lab; b.className = k === wcat ? 'on' : ''; b.onclick = () => { if (['explosive', 'elemental', 'exotic'].includes(k)) coach('arsenal'); wcat = k; const first = Object.keys(PROJ).find(q => !PROJ[q].hidden && inCat(q)); if (first && !inCat(curProj)) curProj = first; buildUI(); $('tray').scrollLeft = 0; }; cats.appendChild(b); }
   for (const key of keys) {
     const am = chal && mode === 'throw' ? chal.ammo.find(a => a.kind === key) : null;
     const locked = mode === 'throw' && isLocked(key), pooled = mode === 'throw' && chal && chal.pool;
     const b = document.createElement('button'); b.className = 'item' + (key === cur ? ' on' : '') + ((am && !am.n) || (pooled && !chal.pool.n) ? ' empty' : '') + (mode === 'throw' && PROJ[key].special ? ' sp' : '') + (locked ? ' locked' : '');
     b.appendChild(iconFor(key)); const l = document.createElement('span'); l.textContent = locked ? `🔒 ${PRICES[key]}` : list[key].label + (am ? ` ×${am.n}` : ''); b.appendChild(l);
-    b.onclick = () => { if (locked) { openShop(); return; } if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; } buildUI(); };
+    b.onclick = () => { if (locked) { openShop(); return; } if (mode === 'build') curBlock = key; else { curProj = key; if (am) curSize = am.size; coach('pick:' + key); } buildUI(); };
     tray.appendChild(b);
   }
   if (mode === 'throw') { const hideSize = (!!chal && !chal.pool) || PROJ[curProj].special; $('sizebar').style.display = hideSize ? 'none' : 'flex'; [...$('sizebar').children].forEach((c, j) => c.classList.toggle('on', j === curSize)); }
-  const icons = $('icons'); icons.innerHTML = '';
-  const add = (txt, title, fn, on) => { const b = document.createElement('button'); b.className = 'ib' + (on ? ' on' : ''); b.textContent = txt; b.title = title; b.setAttribute('aria-label', title); b.onclick = fn; icons.appendChild(b); };
-  if (mode === 'build') {
-    add('🏰', 'Famous builds', openMenu);
-    add('↶', 'Undo', undo);
-    add('🗑', 'Clear all', () => { clearAll(); snapshot = null; dirty = true; updateHud(); toast('Cleared'); });
-  } else {
-    add('🐢', 'Slow motion', () => { slow = !slow; toast(slow ? 'Slow-mo on' : 'Slow-mo off'); buildUI(); }, slow);
-    add('↺', 'Rebuild tower', () => chal ? startChallenge(chal.def) : (clearFields(), lastDown = null, rebuild()));
-    add('🌪', 'Disasters', openDisasters);
-  }
-  add(muted ? '🔇' : '🔊', 'Sound', () => { muted = !muted; buildUI(); });
+  if (mode === 'throw' && !chal && screen === 'game') tipOnce('cats', 'Weapons come in types — tap Explosive, Elemental or Exotic above the tray to find them.');
 }
 function setMode(m) {
   mode = m; drag = null; aim = null; pointers.clear();
   $('mBuild').classList.toggle('on', m === 'build'); $('mThrow').classList.toggle('on', m === 'throw');
   if (replay) stopReplay();
   if (m === 'build' && chal) exitChallenge();
-  $('duelBtn').style.display = m === 'build' ? 'block' : 'none'; $('replayBtn').classList.remove('show'); $('replayMenu').classList.remove('open');
+  $('replayBtn').classList.remove('show'); $('replayMenu').classList.remove('open'); logAct('mode ' + m);
   if (m === 'throw') { if (dirty || !snapshot) takeSnapshot(); cam.tEl = clamp(cam.tEl, .14, .6); lastDown = null; }
   $('sizebar').style.display = m === 'throw' ? 'flex' : 'none';
-  $('levelsBtn').style.display = m === 'throw' ? 'block' : 'none';
-  $('customBtn').style.display = m === 'build' ? 'block' : 'none'; if (m !== 'build') cbPlacing = null;
+  if (m !== 'build') cbPlacing = null;
   if (m === 'throw') coach('throw');
   clearGhost(); if (m !== 'build') stopPlacing(); renderToolbar(); buildUI(); updateDetonate(); updateHud(); showHint();
 }

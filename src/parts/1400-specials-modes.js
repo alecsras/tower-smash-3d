@@ -299,44 +299,44 @@ const LEVELS = [
   { name: 'Citadel Doom', preset: 'citadel', ammo: [['nuke', 1, 1]], stars: [40, 65, 85] }
 ];
 // ---- save data, coins & shop ----
-const SAVE = (() => { let s = {}; try { s = JSON.parse(localStorage.getItem('ts_save') || '{}'); } catch (e) {} return Object.assign({ coins: 250, coinFrac: 0, unlocked: {}, sandbox: false, camp: {}, daily: {}, quality: matchMedia('(pointer:coarse)').matches ? 'low' : 'high' }, s); })();
-const persist = () => { try { localStorage.setItem('ts_save', JSON.stringify(SAVE)); } catch (e) {} };
+// SAVE and persist() live in 0180-save.js
 const PRICES = { firebomb: 120, cluster: 150, rocket: 200, meteor: 300, hole: 450, nuke: 700 };
 const isLocked = k => !chal && !SAVE.sandbox && PRICES[k] && !SAVE.unlocked[k];
 function addCoins(n, why) {
   if (!n) return; SAVE.coins += n; persist(); updateCoins();
-  if (why) { const el = document.createElement('div'); el.className = 'pop coin'; el.textContent = `+${n} 🪙`; el.style.left = 'calc(100% - 60px)'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); }
+  if (why) { const el = document.createElement('div'); el.className = 'pop coin'; el.innerHTML = `+${n} ${ico('Coins', 's16')}`; el.style.left = 'calc(100% - 60px)'; document.body.appendChild(el); setTimeout(() => el.remove(), 1100); }
 }
-function updateCoins() { const b = $('coinBtn'); if (b) b.textContent = `🪙 ${SAVE.coins.toLocaleString()}`; }
+function updateCoins() { const b = $('coinBtn'); if (b) b.innerHTML = `${ico('Coins', 's16')}<span>${SAVE.coins.toLocaleString()}</span>`; }
 function openShop() {
   const g = $('shopList'); g.innerHTML = '';
-  const CAT_NAME = { kinetic: '⚙️ Kinetic', explosive: '💣 Explosive', elemental: '🔥 Elemental', exotic: '🌀 Exotic', silly: '🦆 Silly' };
+  const CAT_NAME = { kinetic: 'Kinetic', explosive: 'Explosive', elemental: 'Elemental', exotic: 'Exotic', silly: 'Silly' };
   let lastCat = null;
   for (const [k, price] of Object.entries(PRICES)) {
-    const cat = PROJ[k].cat || 'power'; if (cat !== lastCat) { lastCat = cat; const h = document.createElement('div'); h.className = 'shophead'; h.textContent = CAT_NAME[cat] || '⭐ Power'; g.appendChild(h); }
+    const cat = PROJ[k].cat || 'power'; if (cat !== lastCat) { lastCat = cat; const h = document.createElement('div'); h.className = 'shophead'; h.textContent = CAT_NAME[cat] || 'Power'; g.appendChild(h); }
     const own = SAVE.unlocked[k] || SAVE.sandbox, row = document.createElement('div'); row.className = 'shoprow';
     row.appendChild(iconFor(k, 'throw'));
     row.insertAdjacentHTML('beforeend', `<div><b>${PROJ[k].label}</b><small>${PROJ[k].desc || ''}</small></div>`);
-    const b = document.createElement('button'); b.className = own ? 'b2' : 'b1'; b.textContent = own ? 'Owned' : `🪙 ${price}`; b.disabled = own;
-    b.onclick = () => { if (SAVE.coins < price) { toast(`Need ${price - SAVE.coins} more coins — smash stuff to earn them`); return; } SAVE.coins -= price; SAVE.unlocked[k] = true; persist(); updateCoins(); snd.ding(); openShop(); buildUI(); };
+    const b = document.createElement('button'); b.className = own ? 'b2' : 'b1'; b.innerHTML = own ? 'Owned' : `${ico('Coins', 's16')} ${price}`; b.disabled = own;
+    b.onclick = async () => { if (SAVE.coins < price) { toast(`You need ${price - SAVE.coins} more coins — smash things to earn them`, 'warn'); return; }
+      if (price > 300 && !(await confirmDlg(`Buy ${PROJ[k].label}?`, `This spends ${price} of your ${SAVE.coins.toLocaleString()} coins.`, `Buy for ${price}`))) return;
+      logAct('buy ' + k); SAVE.coins -= price; SAVE.unlocked[k] = true; persist(); updateCoins(); snd.ding(); openShop(); buildUI(); };
     row.appendChild(b); g.appendChild(row);
   }
-  $('sandboxChk').checked = SAVE.sandbox; $('calmChk').checked = !!SAVE.calm; $('qualityChk').checked = SAVE.quality === 'high';
   $('shop').classList.add('open');
 }
 $('shopX').onclick = () => $('shop').classList.remove('open');
 $('shop').addEventListener('click', e => { if (e.target.id === 'shop') $('shop').classList.remove('open'); });
-$('sandboxChk').onchange = e => { SAVE.sandbox = e.target.checked; persist(); openShop(); buildUI(); };
-$('calmChk').onchange = e => { SAVE.calm = e.target.checked; persist(); document.body.classList.toggle('calm', SAVE.calm); };
-$('qualityChk').onchange = e => { SAVE.quality = e.target.checked ? 'high' : 'low'; persist(); applyQuality(); };
 $('coinBtn').onclick = openShop;
 
 // ---- Blorbs: the little jelly targets of the campaign ----
 const blorbMat = new THREE.MeshStandardMaterial({ color: 0x5ed14a, roughness: .35, emissive: 0x0a3a05, emissiveIntensity: .4 });
+const blorbRimMat = new THREE.MeshBasicMaterial({ color: 0x0b2a06, side: THREE.BackSide });
 const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .2 }), pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
 function makeBlorbMesh() {
   const g = new THREE.Group(), r = .34;
   const body = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), blorbMat); body.scale.set(1, .9, 1); g.add(body);
+  // a dark outline so Blorbs read by shape, not only by their green color
+  const rim = new THREE.Mesh(new THREE.SphereGeometry(r * 1.12, 20, 14), blorbRimMat); rim.scale.set(1, .9, 1); g.add(rim);
   for (const s of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(.1, 12, 10), eyeMat); eye.position.set(s * .12, .08, r * .85); g.add(eye);
     const pupil = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 6), pupilMat); pupil.position.set(s * .12, .08, r * .85 + .07); g.add(pupil);
@@ -372,13 +372,14 @@ function checkBlorbs() {
 // ---- generic challenge engine (campaign, demolition, daily, duels) ----
 // def: {title, setup(), ammo:[[kind,size,n]] | pool:{n, maxSize}, goal:'pct'|'blorb', stars:[..] (pct), onResult(res)->{msg,next,extra}, hud?}
 function startChallenge(def) {
+  goGame(); closeAllSheets(); paused = false; sceneIsFree = false; logAct('level ' + def.title);
   clearFields(); $('result').classList.remove('open'); $('levels').classList.remove('open');
   chal = null; setMode('build'); clearAll();
   const before = objs.length; def.setup();
   chal = { def, ammo: (def.ammo || []).map(([kind, size, n]) => ({ kind, size, n })), pool: def.pool ? { ...def.pool } : null, endAt: null, pct: 0, shown: false, shots: 0,
     blorbs: objs.filter(o => o.type === 'blorb'), winAt: null };
   if (chal.pool) { curProj = 'bomb'; curSize = 1; } else { curProj = chal.ammo[0].kind; curSize = chal.ammo[0].size; }
-  setMode('throw'); lastDown = null; updateHud();
+  setMode('throw'); document.body.classList.add('inlevel'); lastDown = null; updateHud();
   toast(def.title + (def.goal === 'blorb' ? ` — pop all ${chal.blorbs.length} Blorbs!` : ` — ★ at ${def.stars[0]}%`));
 }
 const ammoLeft = () => !chal ? Infinity : chal.pool ? chal.pool.n : chal.ammo.reduce((n, a) => n + a.n, 0);
@@ -425,12 +426,16 @@ function finishChallenge() {
   $('rMsg').textContent = out.msg || (stars === 3 ? 'Perfect!' : win ? 'Nice — go for 3 stars?' : 'So close — try again!');
   $('rNext').style.display = out.next ? '' : 'none'; $('rNext').onclick = () => out.next && startChallenge(out.next);
   $('rRetry').onclick = () => startChallenge(d);
+  $('rLevels').textContent = out.back ? 'Home' : 'Levels';
   $('rLevels').onclick = () => { $('result').classList.remove('open'); out.back ? out.back() : openLevels(); };
+  $('rHome').onclick = () => { $('result').classList.remove('open'); goHome(); }; $('rHome').style.display = out.back ? 'none' : '';
+  $('rReplay').style.display = rec.frames.length > 20 ? '' : 'none'; $('rReplay').onclick = () => { $('result').classList.remove('open'); startReplay(false); };
+  logAct(`result ${d.title} ${stars}★ ${win ? 'win' : 'lose'}`);
   const ex = $('rExtra'); ex.style.display = out.extra ? '' : 'none';
   if (out.extra) { ex.textContent = out.extra.label; ex.onclick = out.extra.onclick; }
   $('result').classList.add('open'); if (win) snd.ding();
 }
-function exitChallenge() { if (!chal) return; chal = null; $('result').classList.remove('open'); toast('Left challenge — free play'); }
+function exitChallenge() { if (!chal) return; chal = null; document.body.classList.remove('inlevel'); $('result').classList.remove('open'); }
 function challengeHud() {
   const d = chal.def, shots = ammoLeft();
   if (d.goal === 'blorb') return `${d.short || ''} 🟢 ${chal.blorbs.filter(b => !b.popped).length} left · 🎯 ${shots}`;
@@ -442,7 +447,7 @@ const loadStars = () => { try { return JSON.parse(localStorage.getItem('ts_stars
 const saveStars = s => { try { localStorage.setItem('ts_stars', JSON.stringify(s)); } catch (e) {} };
 function demoDef(i) {
   const L = LEVELS[i];
-  return { title: `Demolition ${i + 1} · ${L.name}`, short: `D${i + 1}`, goal: 'pct', stars: L.stars, ammo: L.ammo,
+  return { title: `Challenge ${i + 1} · ${L.name}`, short: `D${i + 1}`, goal: 'pct', stars: L.stars, ammo: L.ammo,
     setup: () => loadPreset(PRESETS.find(p => p.id === L.preset)),
     onResult: r => { const st = loadStars(), prev = st[i] || 0; if (r.stars > prev) { st[i] = r.stars; saveStars(st); addCoins((r.stars - prev) * 30, true); }
       return { next: r.stars && i < LEVELS.length - 1 ? demoDef(i + 1) : null, msg: r.stars < 3 ? (r.stars ? `Next star at ${L.stars[r.stars]}%` : `Need ${L.stars[0]}% for a star`) : 'Perfect demolition!' }; } };
@@ -562,7 +567,7 @@ function openLevels(tab) {
     });
   } else {
     const d = SAVE.daily, done = d.date === todayKey();
-    g.insertAdjacentHTML('beforeend', `<div class="daily"><div class="em">📅</div><b>Daily Demolition</b><p>A new city every day. 3 shots — topple as much as you can.</p>
+    g.insertAdjacentHTML('beforeend', `<div class="daily"><div class="em">📅</div><b>Daily challenge</b><p>A new city every day. 3 shots — topple as much as you can.</p>
       <p>🔥 Streak: <b>${d.streak || 0}</b> day${d.streak === 1 ? '' : 's'} · Today's best: <b>${done ? d.best + '%' : '—'}</b></p><p class="small">First play each day: +40 🪙 plus a streak bonus</p></div>`);
     const b = document.createElement('button'); b.className = 'b1 wide'; b.textContent = done ? 'Play again' : 'Play today\'s challenge'; b.onclick = () => startChallenge(dailyDef()); g.appendChild(b);
   }
@@ -638,8 +643,8 @@ function openDuel() {
 let duelBudget = 400;
 $('duelName').value = SAVE.name || ''; $('duelName').onchange = e => { SAVE.name = e.target.value.trim().slice(0, 16); persist(); };
 document.querySelectorAll('#duelBudgets button').forEach(b => b.onclick = () => { duelBudget = +b.dataset.v; document.querySelectorAll('#duelBudgets button').forEach(c => c.classList.toggle('on', c === b)); });
-$('duelFresh').onclick = () => { duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; clearAll(); snapshot = null; dirty = true; setArena(10); $('duel').classList.remove('open'); setMode('build'); toast(`⚔️ Build your fortress — ${duelBudget} block budget`); updateHud(); };
-$('duelUse').onclick = () => { duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; $('duel').classList.remove('open'); setMode('build'); updateHud(); toast('⚔️ Fortress mode on — tap ⚔️ when ready to send'); };
+$('duelFresh').onclick = () => { goGame(); sceneIsFree = false; logAct('duel build'); duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; clearAll(); snapshot = null; dirty = true; setArena(10); $('duel').classList.remove('open'); setMode('build'); toast(`⚔️ Build your fortress — ${duelBudget} block budget`); updateHud(); };
+$('duelUse').onclick = () => { goGame(); sceneIsFree = false; logAct('duel build'); duelBuild = { budget: duelBudget, name: ($('duelName').value || 'A friend').trim().slice(0, 16) }; $('duel').classList.remove('open'); setMode('build'); updateHud(); toast('⚔️ Fortress mode on — tap ⚔️ when ready to send'); };
 $('duelSend').onclick = async () => {
   const used = duelUsed();
   if (!used) { toast('Build something first!'); return; }

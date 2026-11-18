@@ -117,7 +117,7 @@ function explosionFX(c, power, style = 'fire') {
   for (let i = 0; i < 14 + 8 * power; i++) { const a = rand(0, 6.28), s = rand(.5, 3.5) * Math.sqrt(power); spawnSmoke(c.x + rand(-.6, .6) * power, c.y + rand(0, .8), c.z + rand(-.6, .6) * power, Math.cos(a) * s, rand(1, 3.5), Math.sin(a) * s, rand(2.5, 4.5) * Math.sqrt(power), rand(1.6, 2.8) * Math.sqrt(power), [.3, .29, .28].map(x => x + rand(0, .12)), .75); }
   for (let i = 0; i < 6; i++) spawnSmoke(c.x, c.y + .3, c.z, rand(-1, 1), rand(2, 4), rand(-1, 1), rand(.5, .9), rand(1.5, 2.2) * Math.sqrt(power), [1, .55, .2], .8);
   for (let i = 0; i < 26; i++) spawnP(c.x, c.y, c.z, rand(-9, 9), rand(3, 13), rand(-9, 9), rand(.8, 1.6), [.25, .18, .1], .14, -20, 0);
-  shake = .55 * power; boomLayered(power, c);
+  shake = .55 * power; boomLayered(power, c); haptic(Math.min(90, 25 + power * 30));
   try { navigator.vibrate && navigator.vibrate(70); } catch (e) {}
 }
 

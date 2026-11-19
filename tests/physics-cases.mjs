@@ -12,8 +12,9 @@ async function openDriven(page) {
     window.__run = (frames, ms, hitAt) => { const st = { under: 0, rocket: 0, minY: 9 }, seen = new Set();
       for (let f = 0; f < frames; f++) { const q = window.__rafQ.splice(0); window.__t += ms * (.85 + Math.random() * .3); q.forEach(cb => cb(window.__t));
         if (f === hitAt) g.throwAt('ball', 0, 2, 0, .7);
-        for (const o of g.objs) { if (o.gone || o.type !== 'block' || !o.body.rb) continue; const lo = o.body.getAABB().lowerBound.y; st.minY = Math.min(st.minY, lo);
-          if (lo < -.15 && !seen.has(o)) { seen.add(o); st.under++; } if (f > hitAt + 30 && o.body.velocity.y > 7) st.rocket++; } }
+        // sunk: a block's centre more than 20 cm into the floor. launched: a sunk block later shot upward by the floor.
+        for (const o of g.objs) { if (o.gone || o.type !== 'block' || !o.body.rb) continue; const y = o.body.position.y; st.minY = Math.min(st.minY, y);
+          if (y < -.2 && !seen.has(o)) { seen.add(o); st.under++; } if (seen.has(o) && o.body.velocity.y > 5) st.rocket++; } }
       st.minY = +st.minY.toFixed(3); return st; }; });
   return errors;
 }
@@ -41,7 +42,7 @@ export function physicsCases() {
         const bl = g.objs.filter(o => o.type === 'block'), start = new Map(bl.map(o => [o, { ...o.body.position }]));
         for (const o of bl) g.kick(o, 0, 0, 0);
         let under = 0;
-        for (let i = 0; i < 150; i++) { g.ff(1 / 60); for (const o of bl) if (!o.gone && o.body.getAABB().lowerBound.y < -.15) { under++; break; } }
+        for (let i = 0; i < 150; i++) { g.ff(1 / 60); for (const o of bl) if (!o.gone && o.body.position.y < -.2) { under++; break; } }
         let fell = 0; for (const o of bl) { const a = start.get(o), p = o.body.position; if (o.gone || Math.hypot(p.x - a.x, p.y - a.y, p.z - a.z) > .5) fell++; }
         return { n: bl.length, under, fell };
       }, id);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.4 — Physics back to stable
+
+- Fixed blocks sinking into the floor, bouncing and shooting up in every build. The cause was the "settle-to-sleep" speed-up from 0.9.2, which is removed.
+- Back on the physics engine from 0.9.0 (Rapier 0.14). The faster 0.21 engine is shelved until it can be proven stable on iPhone.
+- Kept: adaptive fracture detail, calm-rubble dormancy in 1,500+ block scenes, and shadows only redrawn when something moves.
+- New stability tests run the real game loop at 60 and 120 fps in Chrome and in Safari's engine (iPhone).
+
 ## 0.9.3 — Stability fix
 
 - Fixed builds collapsing on their own: blocks could sink into the floor and pop back up, knocking walls and whole builds down. Calm blocks now only go to sleep together with everything they touch.

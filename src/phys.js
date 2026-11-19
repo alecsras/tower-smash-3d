@@ -31,8 +31,6 @@ export function makePhysics(RAPIER) {
   const rbMap = new Map(), colMap = new Map();
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));
   let activeCount = 0;
-  let napTick = 0;
-  const napList = [], NAP_V2 = .12 * .12, NAP_W2 = .3 * .3, NAP_T = .5;
 
   class PBody {
     // opts: {shape:{kind:'box'|'ball'|'cyl'|'cone'|'hull', ...}, mass?, density?, pos, quat, fric, rest, ccd, ld, ad, events}
@@ -40,7 +38,7 @@ export function makePhysics(RAPIER) {
       Object.assign(this, { fric: .55, rest: .05, ld: .01, ad: .05, ccd: false, events: true }, o);
       this.position = o.pos || new V3(); this.quaternion = o.quat || new Q4();
       this.velocity = new V3(); this.angularVelocity = new V3();
-      this.rb = null; this.userData = null; this._sleep = true; this._calm = 0; this.nap = o.nap !== false;
+      this.rb = null; this.userData = null; this._sleep = true; 
       const s = this.shape;
       this.boundingRadius = s.kind === 'box' ? Math.hypot(s.hx, s.hy, s.hz) : s.kind === 'ball' ? s.r : s.kind === 'hull' ? s.radius : Math.hypot(s.r, s.hh);
       if (this.mass == null) this.mass = this.density * this.volume();
@@ -125,35 +123,10 @@ export function makePhysics(RAPIER) {
     });
     // refresh cached poses of everything that moved; anything not reported is asleep
     for (const pb of rbMap.values()) pb._sleep = true;
-    activeCount = 0; napList.length = 0;
+    activeCount = 0;
     world.forEachActiveRigidBody(rb => {
       const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true;
-      // settle-to-sleep: a body that has barely moved for NAP_T seconds stops being simulated until something touches it
-      // (piles of debris otherwise jitter awake for a long time and cost most of the physics time in big collapses)
-      if (pb.nap) { const v = pb.velocity, w = pb.angularVelocity;
-        if (v.x * v.x + v.y * v.y + v.z * v.z < NAP_V2 && w.x * w.x + w.y * w.y + w.z * w.z < NAP_W2) { if ((pb._calm += dt) > NAP_T) napList.push(pb); } else pb._calm = 0; }
     });
-    if (napList.length && ++napTick % 4 === 0) groupNap();
-  }
-  // Put calm bodies to sleep ONLY as whole connected groups (everything touching or jointed to them must be calm too).
-  // Rapier 0.21 corrupts a body that is put to sleep while something it touches is still awake: it keeps falling
-  // under gravity with no contacts and sinks through the floor (see tests/physics.spec.mjs).
-  function groupNap() {
-    const calm = new Set(napList), done = new Set(), J = world.impulseJoints;
-    for (const start of napList) {
-      if (done.has(start)) continue;
-      const group = [start], seen = new Set(group); let ok = true;
-      const visit = o => { if (!ok || seen.has(o)) return; seen.add(o); if (calm.has(o)) group.push(o); else if (!o.isSleeping()) ok = false; };
-      const visitRb = rb => { const o = rbMap.get(rb.handle); if (o) visit(o); else if (rb.isDynamic() && !rb.isSleeping()) ok = false; };
-      for (let i = 0; i < group.length && ok; i++) {
-        const g = group[i];
-        world.contactPairsWith(world.getCollider(g.colHandle), c => { if (!ok) return; const o = colMap.get(c.handle); if (o) visit(o); else { const p = c.parent(); if (p) visitRb(p); } });
-        J.forEachJointHandleAttachedToRigidBody(g.rb.handle, h => { if (!ok) return; const j = J.get(h); if (!j) return; const a = j.body1(), b = j.body2(); visitRb(a.handle === g.rb.handle ? b : a); });
-      }
-      for (const g of group) done.add(g);
-      if (!ok) continue;
-      for (const pb of group) { pb.rb.sleep(); pb._calm = 0; pb._sleep = true; pb.velocity.set(0, 0, 0); pb.angularVelocity.set(0, 0, 0); activeCount--; }
-    }
   }
   return { world, ground, PBody, step, get activeCount() { return activeCount; }, bodies: () => rbMap.values(), setIterations(n) { world.numSolverIterations = n; } };
 }

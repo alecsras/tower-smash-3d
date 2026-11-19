@@ -18,7 +18,7 @@ function wakeAll() { for (const pb of P.bodies()) pb.wakeUp(); }
 
 
 function createPiece(spec, x, y, z, quat, sleep) {
-  const body = new P.PBody({ shape: specPhys(spec), density: DENS[spec.mat], pos: new V3(x, y, z), quat: quat ? quat.clone() : new Q4(), ...(MATP[spec.mat] || {}), ad: spec.mat === 'domino' ? .01 : .05, nap: spec.mat !== 'domino' });
+  const body = new P.PBody({ shape: specPhys(spec), density: DENS[spec.mat], pos: new V3(x, y, z), quat: quat ? quat.clone() : new Q4(), ...(MATP[spec.mat] || {}), ad: spec.mat === 'domino' ? .01 : .05 });
   return addObj({ body, dormant: !!sleep, sc: spec.shape === 'box' ? spec.d : [1, 1, 1], type: 'block', spec, mat: spec.mat, breakable: !!BRITTLE[spec.mat], tnt: spec.mat === 'tnt', pop: 0 });
 }
 const qY = a => a ? Q4.yaw(a) : null;

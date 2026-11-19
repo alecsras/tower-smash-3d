@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3 — Stability fix
+
+- Fixed builds collapsing on their own: blocks could sink into the floor and pop back up, knocking walls and whole builds down. Calm blocks now only go to sleep together with everything they touch.
+- New test checks that builds stand on their own with every block awake.
+
 ## 0.9.2 — Performance
 
 - Faster physics engine (Rapier 0.21 SIMD): about 1.8x faster on big collapses.

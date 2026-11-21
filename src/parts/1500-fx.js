@@ -32,7 +32,8 @@ function fracture(o) {
 }
 function processFractures() {
   let n = 0;
-  const cap = P.activeCount > 3000 ? 8 : P.activeCount > 1000 ? 14 : 24;   // spread big waves over a few frames
+  let cap = P.activeCount > 3000 ? 8 : P.activeCount > 1000 ? 14 : 24;   // spread big waves over a few frames
+  if (SAVE.quality === 'lite') cap = Math.ceil(cap / 2);
   for (const o of pendingFracture) { pendingFracture.delete(o); fracture(o); if (++n >= cap) break; }
 }
 
@@ -209,9 +210,11 @@ async function useCap(name) {
 // ---- glow (bloom) for high quality ----
 let composer = null, bloomPass = null;
 function applyQuality() {
-  const high = SAVE.quality === 'high';
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, high ? 2 : 1.5));
-  sun.shadow.mapSize.set(high ? 2048 : 1024, high ? 2048 : 1024); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  const high = SAVE.quality === 'high', lite = SAVE.quality === 'lite';
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, high ? 2 : lite ? 1 : 1.5));
+  sun.castShadow = !lite;   // Light: no shadows at all
+  const sm = high ? 2048 : 1024; sun.shadow.mapSize.set(sm, sm); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  shadowDirty = 2;
   if (high && !composer) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));

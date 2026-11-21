@@ -64,3 +64,19 @@ test('performance and usage stats land in the feedback report; background physic
   expect(r.statsToggle).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('graphics tiers: Settings offers Auto/High/Balanced/Light and Light turns off shadows', async ({ page }) => {
+  const errors = await open(page);
+  const r = await page.evaluate(() => {
+    const g = window.__game; g.openSettings();
+    const labels = [...document.querySelectorAll('#settingsBody .segtabs button')].map(b => b.textContent);
+    g.SAVE.quality = 'lite'; g.applyQuality(); const lite = { shadow: g.sunShadow, pr: g.renderer.getPixelRatio() };
+    g.SAVE.quality = 'high'; g.applyQuality(); const high = { shadow: g.sunShadow };
+    return { labels, lite, high };
+  });
+  expect(r.labels).toEqual(['Auto', 'High', 'Balanced', 'Light']);
+  expect(r.lite.shadow).toBe(false);
+  expect(r.lite.pr).toBe(1);
+  expect(r.high.shadow).toBe(true);
+  expect(errors).toEqual([]);
+});

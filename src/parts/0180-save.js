@@ -2,10 +2,16 @@
 // Everything the player earns lives in localStorage under 'ts_*' keys:
 //   ts_save   coins, unlocks, campaign stars, settings, onboarding state (this record, versioned)
 //   ts_stars  challenge stars · ts_slot_1..3 saved builds · ts_auto the last free-play build
+// graphics tier to start on: high (desktop), low = Balanced (most phones), lite = Light (older or low-memory phones)
+function autoTier() {
+  if (!matchMedia('(pointer:coarse)').matches) return 'high';
+  const cores = navigator.hardwareConcurrency || 6, mem = navigator.deviceMemory || 4;
+  return cores <= 4 || mem <= 3 ? 'lite' : 'low';
+}
 const SAVE_VERSION = 2;
 const SAVE_DEFAULTS = () => ({
   v: SAVE_VERSION, coins: 250, coinFrac: 0, unlocked: {}, sandbox: false, camp: {}, daily: {},
-  quality: matchMedia('(pointer:coarse)').matches ? 'low' : 'high', qmode: 'auto',
+  quality: autoTier(), qmode: 'auto',
   name: '', onboarded: false, trained: false, hints: {}, tips: {}, matTheme: 'original', physWorker: false, stats: {}, best: {}, shareStats: true, volume: .8, haptics: true, camArrows: false,
   calm: matchMedia('(prefers-reduced-motion: reduce)').matches, follow: false, myPrefabs: []
 });

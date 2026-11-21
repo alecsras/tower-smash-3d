@@ -32,7 +32,7 @@ const sMat = new THREE.ShaderMaterial({ uniforms: { uScale: pMat.uniforms.uScale
 const sPoints = new THREE.Points(sGeo, sMat); sPoints.frustumCulled = false; sPoints.renderOrder = 2; scene.add(sPoints);
 let smokes = [];
 function spawnSmoke(x, y, z, vx, vy, vz, life, size, col = [.35, .34, .33], alpha = .7) {
-  const cap = SAVE && SAVE.quality === 'high' ? SMOKE_MAX : SMOKE_MAX / 2; if (smokes.length >= cap) smokes.shift();
+  const cap = !SAVE || SAVE.quality === 'high' ? SMOKE_MAX : SAVE.quality === 'lite' ? SMOKE_MAX / 4 : SMOKE_MAX / 2; if (smokes.length >= cap) smokes.shift();
   smokes.push({ x, y, z, vx, vy, vz, t: 0, life, size, col, alpha, r: rand(0, 6.28), w: rand(-.6, .6) });
 }
 function updateSmoke(dt) {
@@ -46,7 +46,7 @@ function updateSmoke(dt) {
   sGeo.setDrawRange(0, n); for (const a of ['position', 'color', 'size', 'alpha', 'rot']) sGeo.attributes[a].needsUpdate = true;
 }
 function spawnP(x, y, z, vx, vy, vz, life, col, size, grav, grow, alpha = 1) {
-  if (parts.length >= MAXP) parts.shift();
+  if (parts.length >= (SAVE && SAVE.quality === 'lite' ? MAXP / 2 : MAXP)) parts.shift();
   parts.push({ x, y, z, vx, vy, vz, t: 0, life, col, size, grav, grow, alpha });
 }
 function updateParticles(dt) {

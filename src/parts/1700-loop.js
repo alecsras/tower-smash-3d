@@ -26,7 +26,7 @@ function tick(now) {
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
   const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
-  prof('frame'); preActivate(); dominoAssist(); dustBudget = SAVE.quality === 'high' ? 14 : 6;
+  prof('frame'); preActivate(); dominoAssist(); dustBudget = SAVE.quality === 'high' ? 14 : SAVE.quality === 'lite' ? 3 : 6;
   let n = 0, applied = 0;
   if (dt > 0) {
     physAcc += dt;
@@ -87,10 +87,16 @@ function tick(now) {
   if (!PROF.noRender) renderFrame(); prof('render');
   if (now - hudT > 200) { hudT = now; updateHud(); prof('hud'); }
   profEnd();
-  // performance governor: if frames stay slow with glow on, drop to light graphics once
+  // performance governor (Auto only): if frames stay under ~30 fps, step down one tier (High → Balanced → Light), never up
   gov.acc += rawDt; gov.n++;
   if (gov.acc > 3) { const avg = gov.acc / gov.n; gov.acc = 0; gov.n = 0;
-    if (avg > .034 && SAVE.quality === 'high' && !gov.done && !replay) { gov.slow++; if (gov.slow >= 2) { gov.done = true; SAVE.quality = 'low'; persist(); applyQuality(); toast('⚡ Switched to light graphics to keep things smooth'); } } else gov.slow = 0; }
+    if (avg > .034 && SAVE.quality !== 'lite' && !gov.done && !replay && screen === 'game') {
+      gov.slow++;
+      if (gov.slow >= (SAVE.quality === 'high' ? 2 : 3)) {
+        gov.slow = 0; SAVE.quality = SAVE.quality === 'high' ? 'low' : 'lite'; persist(); applyQuality();
+        toast(SAVE.quality === 'lite' ? '⚡ Switched to Light graphics to keep things smooth' : '⚡ Switched to Balanced graphics to keep things smooth');
+      }
+    } else gov.slow = 0; }
   requestAnimationFrame(tick);
 }
 

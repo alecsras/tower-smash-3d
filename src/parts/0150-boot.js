@@ -1,6 +1,6 @@
 // ================= boot: the loading screen shown while the page and physics engine start =================
 // (function declarations so the imports part can call them before this file's code runs)
-function bootStep(p, msg) {
+function bootStep(p, msg) { try { performance.mark('boot:' + msg); } catch (e) {}
   const bar = document.getElementById('bootBar'), tip = document.getElementById('bootMsg');
   if (bar) bar.style.width = Math.round(p * 100) + '%'; if (tip && msg) tip.textContent = msg;
 }
@@ -13,8 +13,8 @@ function bootFail(kind) {
     ? 'Tower Smash needs 3D graphics, which this browser has turned off. Try Chrome or Safari, or update your browser.'
     : 'Your browser couldn’t start the physics engine. Try Chrome or Safari, or update your browser.';
 }
-function bootDone() {
+function bootDone() { try { performance.mark('boot:done'); } catch (e) {}
   bootStep(1, 'Ready!');
   const b = document.getElementById('boot'); if (!b) return;
-  setTimeout(() => { b.classList.add('gone'); setTimeout(() => b.remove(), 600); }, 250);
+  b.classList.add('gone'); setTimeout(() => b.remove(), 600);
 }

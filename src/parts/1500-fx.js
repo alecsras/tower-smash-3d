@@ -223,7 +223,9 @@ function applyQuality() {
   }
   resize();
 }
+let framesDrawn = 0;
 function renderFrame() {
+  if (++framesDrawn === 1 || framesDrawn === 10) try { performance.mark('frame:' + framesDrawn); } catch (e) {}
   if (replay || shadowDirty > 0 || ++shadowSafety > 90) { renderer.shadowMap.needsUpdate = true; if (shadowDirty > 0) shadowDirty--; shadowSafety = 0; }
   if (composer && SAVE.quality === 'high') { bloomPass.strength = night ? .95 : .5; bloomPass.threshold = night ? .6 : .86; composer.render(); }
   else renderer.render(scene, camera);

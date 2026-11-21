@@ -53,6 +53,7 @@ test('material themes: presets load in the chosen material; the pad can be repai
   const errors = await open(page);
   const r = await page.evaluate(() => {
     const g = window.__game, castle = g.PRESETS.find(p => p.id === 'castle');
+    for (let n = 0; n < 40; n++) g.SAVE.camp[n] = 3;   // 120 stars: every material unlocked
     const mats = () => { const m = {}; for (const o of g.objs) if (!o.gone && o.type === 'block') m[o.spec.mat] = (m[o.spec.mat] || 0) + 1; return m; };
     g.SAVE.matTheme = 'original'; g.loadPreset(castle); const orig = mats();
     g.SAVE.matTheme = 'ice'; g.loadPreset(castle); const ice = mats();
@@ -72,7 +73,7 @@ test('material themes: presets load in the chosen material; the pad can be repai
 
 test('material picker in the Build Library sets the material for builds', async ({ page }) => {
   const errors = await open(page, { shell: true });
-  await page.evaluate(() => window.__game.openLibrary('mega'));
+  await page.evaluate(() => { const g = window.__game; for (let n = 0; n < 40; n++) g.SAVE.camp[n] = 3; g.openLibrary('mega'); });
   const chip = page.locator('#mgrid .chips.mats .chip', { hasText: 'Steel' });
   await expect(chip).toBeVisible();
   await chip.click({ force: true });

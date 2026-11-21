@@ -432,6 +432,7 @@ function finishChallenge() {
   }
   const res = { stars, win, pct: chal.pct, left, shots: chal.shots };
   const out = d.onResult ? d.onResult(res) || {} : {};
+  checkUnlocks();
   $('rTitle').textContent = d.title;
   $('rStars').innerHTML = [0, 1, 2].map(k => `<span class="${k < stars ? 'on' : ''}" style="animation-delay:${k * .25}s">★</span>`).join('');
   scoreSettle();

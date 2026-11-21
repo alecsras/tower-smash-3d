@@ -141,3 +141,4 @@ button,.item,.tl,.chip,.tile,.mrow,label.tog{touch-action:manipulation;-webkit-t
 .world{display:flex;align-items:center;gap:10px;margin:10px 0 2px;padding:8px 12px;border-radius:12px;background:var(--surface-2,#eef3ff)}
 .world span{font-size:22px}.world b{font-size:15px;flex:1}.world small{font-size:12px;opacity:.75;font-weight:800}
 .world.locked{opacity:.6}
+.chip.locked{opacity:.55}#mgrid .hint{grid-column:1/-1;font-size:12px;opacity:.7;margin:-4px 0 10px;font-weight:700}

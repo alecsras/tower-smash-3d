@@ -12,7 +12,7 @@ const SAVE_VERSION = 2;
 const SAVE_DEFAULTS = () => ({
   v: SAVE_VERSION, coins: 250, coinFrac: 0, unlocked: {}, sandbox: false, camp: {}, daily: {},
   quality: autoTier(), qmode: 'auto',
-  name: '', onboarded: false, trained: false, hints: {}, tips: {}, matTheme: 'original', physWorker: false, stats: {}, best: {}, shareStats: true, volume: .8, haptics: true, camArrows: false,
+  name: '', onboarded: false, trained: false, hints: {}, tips: {}, matTheme: 'original', physWorker: false, stats: {}, best: {}, shareStats: true, matsUnlocked: [], eng: {}, volume: .8, haptics: true, camArrows: false,
   calm: matchMedia('(prefers-reduced-motion: reduce)').matches, follow: false, myPrefabs: []
 });
 function migrateSave(s) {

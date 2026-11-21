@@ -36,3 +36,27 @@ test('the five new mega challenges load with their builds', async ({ page }) => 
   for (const [id, n] of r) expect(n, id).toBeGreaterThan(800);
   expect(errors).toEqual([]);
 });
+
+test('material unlocks: premium materials need stars, unlock with a message, and locked themes fall back', async ({ page }) => {
+  const errors = await open(page, { shell: true });
+  const r = await page.evaluate(() => {
+    const g = window.__game; g.SAVE.camp = {}; g.SAVE.eng = {}; localStorage.removeItem('ts_stars'); g.SAVE.matsUnlocked = [];
+    const before = { ice: g.themeLocked('ice'), stone: g.themeLocked('stone') };
+    g.openLibrary('mega');
+    const chip = [...document.querySelectorAll('#mgrid .chips.mats .chip')].find(c => c.textContent.includes('Gold')).textContent;
+    g.SAVE.matTheme = 'gold'; g.loadPreset(g.PRESETS.find(p => p.id === 'castle'));
+    const fellBack = g.objs.some(o => o.type === 'block' && o.spec.mat !== 'gold');
+    for (let n = 0; n < 4; n++) g.SAVE.camp[n] = 3;                  // 12 stars
+    g.checkUnlocks();
+    const after = { ice: g.themeLocked('ice'), marble: g.themeLocked('marble'), unlocked: [...g.SAVE.matsUnlocked] };
+    g.SAVE.camp = {}; g.SAVE.matTheme = 'original';
+    return { before, chip, fellBack, after };
+  });
+  expect(r.before).toEqual({ ice: true, stone: false });
+  expect(r.chip).toContain('80★');
+  expect(r.fellBack).toBe(true);
+  expect(r.after.ice).toBe(false);
+  expect(r.after.marble).toBe(true);
+  expect(r.after.unlocked).toEqual(['brick', 'ice']);
+  expect(errors).toEqual([]);
+});

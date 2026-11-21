@@ -384,6 +384,22 @@ const MAT_THEMES = [['original', 'Original'], ['mixed', 'Mixed'], ['stone', 'Sto
 const THEME_KEEP = new Set(['tnt', 'domino']);   // these keep their job: TNT still explodes, dominoes still topple
 const THEME_MIX = ['stone', 'wood', 'glass', 'marble', 'brick', 'steel', 'gold', 'crystal', 'ice', 'rubber', 'obsidian', 'concrete', 'sand'];
 let buildTheme = null;
+// premium materials unlock with total stars (campaign + challenges + engineer); the rest are free
+const THEME_COST = { brick: 5, ice: 10, marble: 20, rubber: 30, steel: 45, crystal: 60, gold: 80, obsidian: 100 };
+function totalStars() {
+  const sum = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
+  let ch = {}; try { ch = JSON.parse(localStorage.getItem('ts_stars') || '{}'); } catch (e) {}
+  return sum(SAVE.camp) + sum(ch) + sum(SAVE.eng);
+}
+const themeLocked = k => (THEME_COST[k] || 0) > totalStars();
+// call after stars change: announce materials that just unlocked
+function checkUnlocks() {
+  const have = SAVE.matsUnlocked || (SAVE.matsUnlocked = []);
+  const fresh = Object.keys(THEME_COST).filter(k => !themeLocked(k) && !have.includes(k));
+  if (!fresh.length) return;
+  have.push(...fresh); persist(); track('unlock');
+  setTimeout(() => { toast(`🎨 New material unlocked: ${fresh.map(themeName).join(', ')}. Find it in the Build Library.`, 'good'); snd.ding(); }, 1200);
+}
 const themeName = t => (MAT_THEMES.find(m => m[0] === t) || MAT_THEMES[0])[1];
 // spec.base remembers the material the piece was designed with, so 'original' always restores it
 function themeSpec(spec, theme) {
@@ -408,14 +424,20 @@ function repaintPad(theme) {
 }
 function themeChips(cur, onPick) {
   const row = document.createElement('div'); row.className = 'chips mats';
-  for (const [k, label] of MAT_THEMES) { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.textContent = label; b.onclick = () => onPick(k); row.appendChild(b); }
+  for (const [k, label] of MAT_THEMES) {
+    const b = document.createElement('button'), lock = themeLocked(k);
+    b.className = 'chip' + (k === cur ? ' on' : '') + (lock ? ' locked' : '');
+    b.textContent = lock ? `🔒 ${label} ${THEME_COST[k]}★` : label;
+    b.onclick = () => lock ? toast(`Earn ${THEME_COST[k] - totalStars()} more ★ to unlock ${label}`) : onPick(k);
+    row.appendChild(b);
+  }
   return row;
 }
 function countOf(p) { if (p.count == null) { COUNTING = 0; p.build(); p.count = COUNTING; COUNTING = null; } return p.count; }
 function clearAll() { clearFields(); for (const o of objs) removeObj(o); dormant.clear(); objs = []; placed = []; redoStack = []; clearGhost(); pendingBreak.clear(); pendingBoom = []; parts = []; }
 function loadPreset(p) {
   clearAll(); setArena(p.arena || 10);
-  buildTheme = SAVE.matTheme && SAVE.matTheme !== 'original' ? SAVE.matTheme : null;
+  buildTheme = SAVE.matTheme && SAVE.matTheme !== 'original' && !themeLocked(SAVE.matTheme) ? SAVE.matTheme : null;
   try { p.build(); } finally { buildTheme = null; }
   dirty = true; snapshot = null; curPreset = p;
   const [r, y, el] = p.cam; cam.tR = r; cam.target.y = y; cam.tEl = el;
@@ -444,6 +466,7 @@ function renderMega() {
   const g = $('mgrid'); g.innerHTML = '';
   const mh = document.createElement('div'); mh.className = 'sect'; mh.textContent = 'Material · builds load in this'; g.appendChild(mh);
   g.appendChild(themeChips(SAVE.matTheme || 'original', k => { SAVE.matTheme = k; persist(); renderMega(); }));
+  g.insertAdjacentHTML('beforeend', `<div class="hint">⭐ ${totalStars()} stars · earn stars in Levels to unlock more materials</div>`);
   for (const [title, list] of [['Mega builds · 500–5,000 blocks', PRESETS.filter(p => p.mega).sort((a, b) => countOf(a) - countOf(b))], ['Classic builds', PRESETS.filter(p => !p.mega)]]) {
     const h = document.createElement('div'); h.className = 'sect'; h.textContent = title; g.appendChild(h);
     for (const p of list) {

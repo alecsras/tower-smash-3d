@@ -1,6 +1,7 @@
 // ================= HUD / UI =================
 function updateHud() {
   const hud = $('hud'), blocks = objs.filter(o => o.type === 'block');
+  if (eng) { const t = engHud(); if (mode === 'build' || eng.phase !== 'build') { hud.textContent = t; if (mode === 'build') return; } }
   if (mode === 'build') { const n = blocks.filter(o => !o.gone).length; hud.textContent = duelBuild ? `⚔️ ${duelUsed()} / ${duelBuild.budget} budget` : `🧱 ${n} block${n === 1 ? '' : 's'}`; hud.classList.toggle('over', !!duelBuild && duelUsed() > duelBuild.budget); return; }
   const homes = blocks.filter(o => o.home);
   if (!homes.length) { hud.textContent = chal ? challengeHud() : 'Build a tower first!'; return; }

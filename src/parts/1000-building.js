@@ -64,7 +64,8 @@ function placeCell(f, x, z, cache, quiet) {
   if (!inPad(x, z)) { if (!quiet) toast('Build on the sandy pad'); return null; }
   const { top, calm } = topAt(x, z, f.fx, f.fz, cache);
   if (top + f.hgt > MAX_H) { if (!quiet) toast('Too tall — sky limit!'); return null; }
-  if (duelBuild && duelUsed() + pieceCost(f.spec) > duelBuild.budget) { if (!quiet) toast('Budget used up — send it, or undo some blocks'); return null; }
+  const bb = buildBudget();
+  if (bb != null && duelUsed() + pieceCost(f.spec) > bb) { if (!quiet) toast(eng ? 'Budget used up — test it, or undo some blocks' : 'Budget used up — send it, or undo some blocks'); return null; }
   const o = createPiece(f.spec, x, top + f.hgt / 2 + .0005, z, qY(f.rot), calm);
   o.pop = 1; o.mdirty = true;
   if (cache) { const a = o.body.getAABB(), k = Math.floor(x / 2) + ',' + Math.floor(z / 2); if (!cache.has(k)) cache.set(k, []); cache.get(k).push([a, true]);

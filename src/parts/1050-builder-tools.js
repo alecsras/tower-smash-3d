@@ -104,7 +104,7 @@ function toolUp(moved) {
   if (!moved && !stroke.tapAnchor && stroke.a.x === stroke.b.x && stroke.a.z === stroke.b.z) { stroke.tapAnchor = true; toast('Now tap (or drag to) the end point'); return; }
   const plan = strokePlan(stroke.a, stroke.b), f = stroke.a.frame, out = [];
   for (const [x, top, z] of plan) {
-    if (duelBuild && duelUsed() + pieceCost(f.spec) > duelBuild.budget) { toast('Budget used up'); break; }
+    const bb = buildBudget(); if (bb != null && duelUsed() + pieceCost(f.spec) > bb) { toast('Budget used up'); break; }
     out.push(createPiece(f.spec, x, top + f.hgt / 2 + .0005, z, qY(f.rot), true));
   }
   clearGhost();

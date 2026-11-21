@@ -43,7 +43,7 @@ function tick(now) {
   // the blocks even when physics (in a worker, or on a busy phone) falls behind the screen
   simTime += applied * STEP; prof('physics');
   if (applied) processFractures();
-  updateFire(); prof('fx-logic');
+  updateFire(); engTick(); prof('fx-logic');
   // events
   if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }
   for (const o of objs) {

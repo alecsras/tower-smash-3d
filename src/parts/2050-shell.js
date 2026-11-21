@@ -22,6 +22,7 @@ function goHome() {
   closeAllSheets(); paused = false; endCoach(); training = false; stopPlacing();
   if (chal) { chal = null; $('result').classList.remove('open'); }
   if (duelBuild) duelBuild = null;
+  if (eng) endEng();
   clearFields(); for (const o of objs.filter(q => q.type === 'proj' && !q.gone)) removeObj(o);   // nothing keeps exploding behind Home
   if (sceneIsFree) autosaveFree();
   if (mode !== 'build') setMode('build');

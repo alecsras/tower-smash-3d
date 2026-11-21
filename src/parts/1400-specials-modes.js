@@ -378,6 +378,7 @@ function checkBlorbs() {
 function startChallenge(def) {
   goGame(); closeAllSheets(); paused = false; sceneIsFree = false; logAct('level ' + def.title);
   clearFields(); $('result').classList.remove('open'); $('levels').classList.remove('open');
+  if (eng) endEng();
   chal = null; setMode('build'); clearAll();
   const before = objs.length; def.setup();
   chal = { def, ammo: (def.ammo || []).map(([kind, size, n]) => ({ kind, size, n })), pool: def.pool ? { ...def.pool } : null, endAt: null, pct: 0, shown: false, shots: 0,
@@ -389,6 +390,7 @@ function startChallenge(def) {
 const ammoLeft = () => !chal ? Infinity : chal.pool ? chal.pool.n : chal.ammo.reduce((n, a) => n + a.n, 0);
 const ammoTotal = () => !chal ? 0 : chal.pool ? chal.def.pool.n : chal.def.ammo.reduce((n, a) => n + a[2], 0);
 function useAmmo() {
+  if (eng && eng.phase !== 'build' && !eng.firing) return null;   // no throwing during an engineer test
   if (!chal) { if (isLocked(curProj)) { openShop(); return false; } return true; }
   if (chal.shown || chal.endAt) return null;
   if (chal.pool) { if (chal.pool.n <= 0) return false; chal.pool.n--; }
@@ -572,7 +574,7 @@ function dailyDef() {
 let levelsTab = 'camp';
 function openLevels(tab) {
   if (tab) levelsTab = tab;
-  for (const t of ['camp', 'demo', 'daily']) $('tab_' + t).classList.toggle('on', t === levelsTab);
+  for (const t of ['camp', 'demo', 'eng', 'daily']) $('tab_' + t).classList.toggle('on', t === levelsTab);
   const g = $('lgrid'); g.innerHTML = ''; g.className = levelsTab === 'camp' ? 'camp' : '';
   if (levelsTab === 'camp') {
     const tot = campStars();
@@ -598,7 +600,8 @@ function openLevels(tab) {
       b.onclick = () => locked ? toast('Get ★ on the previous level first') : startLevel(i);
       g.appendChild(b);
     });
-  } else {
+  } else if (levelsTab === 'eng') renderEngTab(g);
+  else {
     const d = SAVE.daily, done = d.date === todayKey();
     g.insertAdjacentHTML('beforeend', `<div class="daily"><div class="em">📅</div><b>Daily challenge</b><p>A new city every day. 3 shots — topple as much as you can.</p>
       <p>🔥 Streak: <b>${d.streak || 0}</b> day${d.streak === 1 ? '' : 's'} · Today's best: <b>${done ? d.best + '%' : '—'}</b></p><p class="small">First play each day: +40 🪙 plus a streak bonus</p></div>`);
@@ -606,7 +609,7 @@ function openLevels(tab) {
   }
   $('levels').classList.add('open');
 }
-for (const t of ['camp', 'demo', 'daily']) $('tab_' + t).onclick = () => openLevels(t);
+for (const t of ['camp', 'demo', 'eng', 'daily']) $('tab_' + t).onclick = () => openLevels(t);
 $('levelsX').onclick = () => $('levels').classList.remove('open');
 $('levels').addEventListener('click', e => { if (e.target.id === 'levels') $('levels').classList.remove('open'); });
 

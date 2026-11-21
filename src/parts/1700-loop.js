@@ -26,7 +26,7 @@ function tick(now) {
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
   const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
-  prof('frame'); preActivate(); dominoAssist();
+  prof('frame'); preActivate(); dominoAssist(); dustBudget = SAVE.quality === 'high' ? 14 : 6;
   let n = 0, applied = 0;
   if (dt > 0) {
     physAcc += dt;

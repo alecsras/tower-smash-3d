@@ -30,6 +30,14 @@ function dominoAssist() {
   }
 }
 let lastBuzz = 0;
+let dustBudget = 0;   // dust puffs left this frame (refilled by the loop)
+function dustPuff(o, impact) {
+  const p = o.body.position, n = Math.min(4, 1 + Math.floor(impact / 6)), r = Math.min(1.2, o.body.boundingRadius);
+  for (let i = 0; i < n && dustBudget > 0; i++, dustBudget--) {
+    const a = Math.random() * 6.283, sp = rand(.6, 1.6) + impact * .05;
+    spawnSmoke(p.x + Math.cos(a) * r * .6, .15, p.z + Math.sin(a) * r * .6, Math.cos(a) * sp, rand(.3, .8), Math.sin(a) * sp, rand(.9, 1.5), rand(.9, 1.6) * Math.max(.6, r), [.6, .55, .46], .55);
+  }
+}
 function onHit(a, b, impact) { if (a && a.userData) handleHit(a.userData, b, impact); if (b && b.userData) handleHit(b.userData, a, impact); }
 function handleHit(o, other, impact) {
   if (o.gone) return;
@@ -43,6 +51,9 @@ function handleHit(o, other, impact) {
   if (o.bonds) bondHitCheck(o, eff);
   if (canFracture(o) && eff > (o.charred ? 5 : FRACT[o.mat])) pendingFracture.add(o);
   if (o.type === 'proj' && impact > 9 && performance.now() - lastBuzz > 120) { lastBuzz = performance.now(); try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
+  // F5 impact feel: dust where heavy blocks hit the ground; a camera kick for big direct hits
+  if (!other && o.type === 'block' && impact > 5 && dustBudget > 0) dustPuff(o, impact);
+  if (o.type === 'proj' && other && impact > 12) shake = Math.max(shake, Math.min(.45, impact / 70));
   if (impact > 2.5 && o.type !== 'shard') {
     const t = performance.now();
     if (t - lastSnd > 40) {

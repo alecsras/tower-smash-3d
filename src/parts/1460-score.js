@@ -8,7 +8,7 @@ const SCORE = { pts: 0, chain: 0, mult: 1, lastT: -9, best: 0, key: null, settle
 
 function scoreKey() { return chal ? 'level:' + chal.def.title : curPreset ? 'build:' + curPreset.id : null; }
 function scoreReset() {
-  Object.assign(SCORE, { pts: 0, chain: 0, mult: 1, lastT: -9, settledAt: 0, announced: false, key: scoreKey() });
+  Object.assign(SCORE, { pts: 0, chain: 0, mult: 1, lastT: -9, settledAt: 0, announced: false, beat: false, key: scoreKey() });
   SCORE.best = SCORE.key && SAVE.best ? SAVE.best[SCORE.key] || 0 : 0;
 }
 function comboMult(chain) { return Math.min(5, 1 + Math.floor(chain / 8) * .5); }
@@ -18,6 +18,10 @@ function scoreTopple(o) {
   SCORE.chain++; SCORE.lastT = simTime;
   const m = comboMult(SCORE.chain);
   if (m > SCORE.mult && m >= 2) multPop(m);
+  if (m >= 3 && !SCORE.beat) {   // the first time a chain reaction really takes off: a beat of slow-motion and a rumble
+    SCORE.beat = true; snd.rumble();
+    if (!SAVE.calm) { bulletUntil = Math.max(bulletUntil, simTime + .6); shake = Math.max(shake, .35); }
+  }
   SCORE.mult = m;
   const h = o.home ? Math.max(0, o.home.p.y) : 0;
   SCORE.pts += Math.round((SCORE_MAT[o.mat] || 10) * (1 + h / 4) * m);

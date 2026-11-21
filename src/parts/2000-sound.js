@@ -34,6 +34,7 @@ function boomLayered(power = 1, pos) {
 const snd = {
   place() { noise(.07, 'lowpass', 700, .35); },
   thud(v) { noise(.13, 'lowpass', 450, .6 * v); },
+  rumble() { noise(1.6, 'lowpass', 110, .9); tone(55, 34, 1.4, .35); },
   clack(v) { noise(.08, 'bandpass', 1500, .5 * v, 1.5); },
   tink(v) { tone(3000 + Math.random() * 1200, 2400, .12, .06 * v, 'triangle'); },
   glass(v) { noise(.3, 'highpass', 3200, .35 * v); tone(2600 + Math.random() * 1500, 1800, .25, .07, 'triangle'); tone(4200, 3000, .18, .04, 'triangle'); },

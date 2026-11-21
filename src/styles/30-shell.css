@@ -137,3 +137,7 @@ button,.item,.tl,.chip,.tile,.mrow,label.tog{touch-action:manipulation;-webkit-t
 .item:active{transform:scale(.94)}
 @supports (height:100dvh){ .sheet{max-height:92dvh} }
 #mgrid .chips.mats,#moreList .chips.mats{grid-column:1/-1;margin:2px 0 10px}#moreList .chips.mats{padding:4px 12px}
+#lgrid.camp .sect,#lgrid.camp .world{grid-column:1/-1}
+.world{display:flex;align-items:center;gap:10px;margin:10px 0 2px;padding:8px 12px;border-radius:12px;background:var(--surface-2,#eef3ff)}
+.world span{font-size:22px}.world b{font-size:15px;flex:1}.world small{font-size:12px;opacity:.75;font-weight:800}
+.world.locked{opacity:.6}

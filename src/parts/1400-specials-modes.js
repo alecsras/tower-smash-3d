@@ -294,7 +294,13 @@ const LEVELS = [
   { name: 'Downtown Drop', preset: 'downtown', ammo: [['anvil', 2, 2], ['rocket', 1, 1]], stars: [30, 55, 80] },
   { name: 'Fortress Fall', preset: 'fortress', ammo: [['cluster', 1, 2], ['bomb', 2, 2]], stars: [20, 40, 60] },
   { name: 'Metro Meltdown', preset: 'metropolis', ammo: [['hole', 1, 1], ['meteor', 1, 1]], stars: [20, 40, 60] },
-  { name: 'Citadel Doom', preset: 'citadel', ammo: [['nuke', 1, 1]], stars: [40, 65, 85] }
+  { name: 'Citadel Doom', preset: 'citadel', ammo: [['nuke', 1, 1]], stars: [40, 65, 85] },
+  // the ~1,000-block builds (appended so saved stars keep their level numbers)
+  { name: 'Sky Tower Takedown', preset: 'skytower', ammo: [['bomb', 2, 2], ['rocket', 1, 1]], stars: [25, 45, 65] },
+  { name: 'Wall Breaker', preset: 'greatwall', ammo: [['cannon', 2, 3], ['bomb', 1, 1]], stars: [15, 30, 45] },
+  { name: 'Arena Rumble', preset: 'stadium', ammo: [['boulder', 2, 2], ['bomb', 1, 2]], stars: [20, 40, 60] },
+  { name: 'Ziggurat Blast', preset: 'ziggurat', ammo: [['rocket', 1, 2], ['anvil', 2, 1]], stars: [15, 30, 50] },
+  { name: 'Bridge Down', preset: 'viaduct', ammo: [['cannon', 2, 2], ['bomb', 2, 1]], stars: [20, 40, 60] }
 ];
 // ---- save data, coins & shop ----
 // SAVE and persist() live in 0180-save.js
@@ -462,7 +468,19 @@ function demoDef(i) {
 }
 const startLevel = i => startChallenge(demoDef(i));
 
-// ---- campaign: 50 generated levels ----
+// ---- campaign: 50 generated levels in 5 worlds; each world opens at a total-star gate ----
+const WORLDS = [{ name: 'Timber Town', em: '🌲', gate: 0 }, { name: 'Stone Valley', em: '⛰️', gate: 12 }, { name: 'Concrete City', em: '🏙️', gate: 30 },
+  { name: 'Marble Heights', em: '🏛️', gate: 50 }, { name: 'Golden Citadel', em: '👑', gate: 75 }];
+const campStars = () => Object.values(SAVE.camp).reduce((a, b) => a + b, 0);
+const worldOf = n => WORLDS[Math.min(4, Math.floor(n / 10))];
+// why level n can't be played yet ('' = playable)
+function campLock(n) {
+  const w = worldOf(n), have = campStars(), first = Math.floor(n / 10) * 10;
+  const visited = Array.from({ length: 10 }, (_, i) => SAVE.camp[first + i] || 0).some(Boolean);   // never re-lock a world you've played
+  if (have < w.gate && !visited) return `Earn ${w.gate - have} more ★ to open ${w.name}`;
+  if (n > 0 && !(SAVE.camp[n - 1] > 0)) return 'Beat the previous level first';
+  return '';
+}
 const TIER_MATS = [['wood', 'glass'], ['wood', 'stone', 'striped'], ['stone', 'concrete', 'checker'], ['concrete', 'marble', 'stone', 'checker'], ['stone', 'concrete', 'marble', 'gold']];
 const TIER_AMMO = [[['ball', 1, 2], ['bowling', 1, 1]], [['bowling', 1, 2], ['cannon', 1, 1]], [['cannon', 1, 2], ['bomb', 1, 1]], [['bomb', 1, 2], ['anvil', 2, 1], ['rocket', 1, 1]], [['bomb', 2, 2], ['cluster', 1, 1], ['rocket', 1, 1]]];
 function cfg(o) { return Object.assign(cbDefault(), { windows: 0, roof: false, floors: 0 }, o); }
@@ -520,9 +538,11 @@ function placeLayout(L) {
 }
 function campaignDef(n) {
   const L = campaignLayout(n);
-  return { title: `Level ${n + 1}${L.type === 'boss' ? ' · BOSS' : ''}`, short: `L${n + 1}`, goal: 'blorb', ammo: L.ammo, setup: () => placeLayout(campaignLayout(n)),
+  return { title: `${worldOf(n).em} Level ${n + 1}${L.type === 'boss' ? ' · BOSS' : ''}`, short: `L${n + 1}`, goal: 'blorb', ammo: L.ammo, setup: () => placeLayout(campaignLayout(n)),
     onResult: r => { const prev = SAVE.camp[n] || 0; if (r.stars > prev) { SAVE.camp[n] = r.stars; persist(); addCoins((r.stars - prev) * 20 + (prev ? 0 : 15), true); }
-      return { next: r.win && n < 49 ? campaignDef(n + 1) : null, msg: r.win ? (r.stars < 3 ? 'Win with more shots left for 3 ★' : 'Flawless!') : 'Blorbs survived — try another angle' }; } };
+      const lock = n < 49 ? campLock(n + 1) : 'last';
+      return { next: r.win && !lock ? campaignDef(n + 1) : null,
+        msg: r.win ? (lock && lock !== 'last' ? lock : r.stars < 3 ? 'Win with more shots left for 3 ★' : 'Flawless!') : 'Blorbs survived — try another angle' }; } };
 }
 
 // ---- daily challenge ----
@@ -554,13 +574,17 @@ function openLevels(tab) {
   for (const t of ['camp', 'demo', 'daily']) $('tab_' + t).classList.toggle('on', t === levelsTab);
   const g = $('lgrid'); g.innerHTML = ''; g.className = levelsTab === 'camp' ? 'camp' : '';
   if (levelsTab === 'camp') {
-    const tot = Object.values(SAVE.camp).reduce((a, b) => a + b, 0);
+    const tot = campStars();
     g.insertAdjacentHTML('beforeend', `<div class="sect">Pop every Blorb 🟢 · ${tot} / 150 ★</div>`);
     for (let n = 0; n < 50; n++) {
-      const st = SAVE.camp[n] || 0, locked = n > 0 && !(SAVE.camp[n - 1] > 0), boss = n % 10 === 9;
+      if (n % 10 === 0) {   // world header
+        const w = worldOf(n), ws = Array.from({ length: 10 }, (_, i) => SAVE.camp[n + i] || 0).reduce((a, b) => a + b, 0), open = tot >= w.gate || ws > 0;
+        g.insertAdjacentHTML('beforeend', `<div class="world${open ? '' : ' locked'}"><span>${open ? w.em : '🔒'}</span><b>${w.name}</b><small>${open ? `${ws} / 30 ★` : `Opens at ${w.gate} ★`}</small></div>`);
+      }
+      const st = SAVE.camp[n] || 0, why = campLock(n), locked = !!why, boss = n % 10 === 9;
       const b = document.createElement('button'); b.className = 'lvlc' + (locked ? ' locked' : '') + (boss ? ' boss' : '') + (st ? ' done' : '');
       b.innerHTML = `<b>${locked ? '🔒' : boss ? '👑' : n + 1}</b><i>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</i>`;
-      b.onclick = () => locked ? toast('Beat the previous level first') : startChallenge(campaignDef(n));
+      b.onclick = () => locked ? toast(why) : startChallenge(campaignDef(n));
       g.appendChild(b);
     }
   } else if (levelsTab === 'demo') {

@@ -1,8 +1,9 @@
-// ================= physics (Rapier) =================
-// A thin body wrapper so game code reads cached position/rotation/velocity without
-// crossing into WASM, and so resting blocks can live OUTSIDE the simulation ("dormant")
-// until something moving comes near them.
+// ================= physics: the game's side =================
+// PBody is a thin proxy: game code reads cached position/rotation/velocity, and every change is queued as a
+// command for the engine (engine.js), which runs either in a Web Worker or on the main thread. Resting blocks
+// can live OUTSIDE the simulation ("dormant") until something moving comes near them.
 export const GRAV = -20;
+const POSE = 14;
 export class V3 {
   constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
   set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
@@ -24,23 +25,32 @@ export class Q4 {
   }
 }
 
-export function makePhysics(RAPIER) {
-  const world = new RAPIER.World({ x: 0, y: GRAV, z: 0 });
-  world.numSolverIterations = 4;
-  // notice contacts up to 6 mm away, so a block resting a hair above another never free-falls onto it
-  world.integrationParameters.normalizedPredictionDistance = .006;
-  const queue = new RAPIER.EventQueue(true);
-  const rbMap = new Map(), colMap = new Map();
-  const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));
-  let activeCount = 0, stepNo = 0;
+// src: the engine bundle (engine-entry.js) as text. worker: try to run it off the main thread.
+export async function makePhysics({ src, worker: wantWorker }) {
+  const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  let engine = null, wk = null;
+  if (wantWorker) {
+    try { wk = await startWorker(url); }
+    catch (e) { console.warn('Physics worker unavailable; running physics on the main thread.', e); wk = null; }
+  }
+  if (!wk) { await loadScript(url); engine = await self.TSEngine.start(); }
+
+  let cmds = [], nextId = 1, nextJoint = 1, activeCount = 0, stepNo = 0, stepsTotal = 0, iters = 4;
+  let inFlight = false, owed = 0, pending = null, seq = 0;
+  const byId = new Map();
+  if (wk) wk.onmessage = e => {
+    const m = e.data;
+    if (m.t === 'res') { pending = m; inFlight = false; }
+    else if (m.t === 'error') setTimeout(() => { throw new Error('Physics worker: ' + m.message); });
+  };
 
   class PBody {
-    // opts: {shape:{kind:'box'|'ball'|'cyl'|'cone'|'hull', ...}, mass?, density?, pos, quat, fric, rest, ccd, ld, ad, events}
+    // opts: {shape:{kind:'box'|'ball'|'cyl'|'cone'|'hull', ...}, mass?, density?, pos, quat, fric, rest, ccd, ld, ad, events, gs, lockRot}
     constructor(o) {
       Object.assign(this, { fric: .55, rest: .05, ld: .01, ad: .05, ccd: false, events: true }, o);
       this.position = o.pos || new V3(); this.quaternion = o.quat || new Q4();
       this.velocity = new V3(); this.angularVelocity = new V3();
-      this.rb = null; this.userData = null; this._sleep = true;
+      this.id = 0; this.inWorld = false; this.userData = null; this._sleep = true;
       this.prevP = new V3(); this.prevQ = new Q4(); this._step = -1;   // pose one fixed step ago, for smoothed drawing
       const s = this.shape;
       this.boundingRadius = s.kind === 'box' ? Math.hypot(s.hx, s.hy, s.hz) : s.kind === 'ball' ? s.r : s.kind === 'hull' ? s.radius : Math.hypot(s.r, s.hh);
@@ -54,50 +64,29 @@ export function makePhysics(RAPIER) {
       if (s.kind === 'cone') return Math.PI * s.r * s.r * 2 * s.hh / 3;
       return s.vol;
     }
-    colliderDesc() {
-      const s = this.shape; let d;
-      if (s.kind === 'box') d = RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz);
-      else if (s.kind === 'ball') d = RAPIER.ColliderDesc.ball(s.r);
-      else if (s.kind === 'cyl') d = RAPIER.ColliderDesc.cylinder(s.hh, s.r);
-      else if (s.kind === 'cone') d = RAPIER.ColliderDesc.cone(s.hh, s.r);
-      else d = RAPIER.ColliderDesc.convexHull(s.points);
-      d.setFriction(this.fric).setRestitution(this.rest).setMass(this.mass);
-      if (this.events) d.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-      return d;
-    }
-    get inWorld() { return !!this.rb; }
+    get rb() { return this.inWorld ? this : null; }   // truthy while in the simulation (older code checks body.rb)
     attach(sleeping) {
-      if (this.rb) return;
-      const p = this.position, q = this.quaternion, v = this.velocity, w = this.angularVelocity;
-      const d = RAPIER.RigidBodyDesc.dynamic().setTranslation(p.x, p.y, p.z).setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-        .setLinvel(v.x, v.y, v.z).setAngvel({ x: w.x, y: w.y, z: w.z }).setLinearDamping(this.ld).setAngularDamping(this.ad).setCcdEnabled(this.ccd).setCanSleep(true);
-      if (sleeping) d.setSleeping(true);
-      if (this.gs != null) d.setGravityScale(this.gs);
-      if (this.lockRot) d.lockRotations();
-      this.rb = world.createRigidBody(d);
-      const col = world.createCollider(this.colliderDesc(), this.rb);
-      this.colHandle = col.handle; rbMap.set(this.rb.handle, this); colMap.set(col.handle, this);
-      this._sleep = !!sleeping;
+      if (this.inWorld) return;
+      const s = this.shape, p = this.position, q = this.quaternion, v = this.velocity, w = this.angularVelocity;
+      this.id = nextId++; this.inWorld = true; this._sleep = !!sleeping; byId.set(this.id, this);
+      cmds.push(['add', this.id, { kind: s.kind, hx: s.hx, hy: s.hy, hz: s.hz, r: s.r, hh: s.hh, points: s.points, mass: this.mass, fric: this.fric, rest: this.rest,
+        ld: this.ld, ad: this.ad, ccd: this.ccd, gs: this.gs, lockRot: this.lockRot, events: this.events, sleeping: !!sleeping,
+        p: [p.x, p.y, p.z], q: [q.x, q.y, q.z, q.w], v: [v.x, v.y, v.z], w: [w.x, w.y, w.z] }]);
     }
     detach() {
-      if (!this.rb) return;
-      this.pull(); rbMap.delete(this.rb.handle); colMap.delete(this.colHandle);
-      world.removeRigidBody(this.rb); this.rb = null; this._sleep = true;
+      if (!this.inWorld) return;
+      cmds.push(['rm', this.id]); byId.delete(this.id); this.inWorld = false; this._sleep = true;
     }
-    pull(stepped) { // copy state out of the simulation (stepped: remember the previous pose for smoothing)
-      if (stepped) { this.prevP.copy(this.position); this.prevQ.copy(this.quaternion); this._step = stepNo; }
-      const rb = this.rb, t = rb.translation(), r = rb.rotation(), v = rb.linvel(), w = rb.angvel();
-      this.position.set(t.x, t.y, t.z); this.quaternion.set(r.x, r.y, r.z, r.w); this.velocity.set(v.x, v.y, v.z); this.angularVelocity.set(w.x, w.y, w.z);
-    }
-    isSleeping() { return !this.rb || this._sleep; }
-    wakeUp() { if (this.rb) { this.rb.wakeUp(); this._sleep = false; } }
-    sleep() { if (this.rb) this.rb.sleep(); this._sleep = true; this.velocity.set(0, 0, 0); this.angularVelocity.set(0, 0, 0); }
-    setVelocity(x, y, z) { this.velocity.set(x, y, z); if (this.rb) this.rb.setLinvel({ x, y, z }, true); }
-    setAngularVelocity(x, y, z) { this.angularVelocity.set(x, y, z); if (this.rb) this.rb.setAngvel({ x, y, z }, true); }
+    pull() {}   // poses arrive with every step result
+    isSleeping() { return !this.inWorld || this._sleep; }
+    wakeUp() { if (this.inWorld) { cmds.push(['wake', this.id]); this._sleep = false; } }
+    sleep() { if (this.inWorld) cmds.push(['sleep', this.id]); this._sleep = true; this.velocity.set(0, 0, 0); this.angularVelocity.set(0, 0, 0); }
+    setVelocity(x, y, z) { this.velocity.set(x, y, z); if (this.inWorld) cmds.push(['lv', this.id, x, y, z]); }
+    setAngularVelocity(x, y, z) { this.angularVelocity.set(x, y, z); if (this.inWorld) cmds.push(['av', this.id, x, y, z]); }
     applyImpulse(imp, rel) {
-      if (!this.rb) return;
-      if (rel) { const r = this.quaternion.vmult(rel), p = this.position; this.rb.applyImpulseAtPoint({ x: imp.x, y: imp.y, z: imp.z }, { x: p.x + r.x, y: p.y + r.y, z: p.z + r.z }, true); }
-      else this.rb.applyImpulse({ x: imp.x, y: imp.y, z: imp.z }, true);
+      if (!this.inWorld) return;
+      if (rel) { const r = this.quaternion.vmult(rel), p = this.position; cmds.push(['impAt', this.id, imp.x, imp.y, imp.z, p.x + r.x, p.y + r.y, p.z + r.z]); }
+      else cmds.push(['imp', this.id, imp.x, imp.y, imp.z]);
       this._sleep = false;
     }
     getAABB() { // world-space bounds from cached pose
@@ -114,26 +103,37 @@ export function makePhysics(RAPIER) {
     }
   }
 
-  // advance the simulation; onHit(a, b, impactSpeed) fires for new contacts using pre-step velocities
-  function step(dt, onHit) {
-    stepNo++;
-    world.timestep = dt;
-    world.step(queue);
-    queue.drainCollisionEvents((h1, h2, started) => {
-      if (!started) return;
-      const a = colMap.get(h1), b = colMap.get(h2);
-      const va = a ? a.velocity : null, vb = b ? b.velocity : null;
-      const ax = va ? va.x : 0, ay = va ? va.y : 0, az = va ? va.z : 0, bx = vb ? vb.x : 0, by = vb ? vb.y : 0, bz = vb ? vb.z : 0;
-      onHit(a, b, Math.hypot(ax - bx, ay - by, az - bz));
-    });
-    // refresh cached poses of everything that moved; anything not reported is asleep
-    for (const pb of rbMap.values()) pb._sleep = true;
-    activeCount = 0;
-    world.forEachActiveRigidBody(rb => {
-      const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(true); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true;
-    });
+  // take in one engine result: new poses for everything awake, then the collisions (onHit(a, b, impactSpeed))
+  function apply(r, onHit) {
+    stepNo++; stepsTotal += r.steps;
+    for (const pb of byId.values()) pb._sleep = true;
+    const a = r.poses;
+    for (let k = 0; k < a.length; k += POSE) {
+      const pb = byId.get(a[k]); if (!pb) continue;
+      pb.prevP.copy(pb.position); pb.prevQ.copy(pb.quaternion); pb._step = stepNo;
+      pb.position.set(a[k + 1], a[k + 2], a[k + 3]); pb.quaternion.set(a[k + 4], a[k + 5], a[k + 6], a[k + 7]);
+      pb.velocity.set(a[k + 8], a[k + 9], a[k + 10]); pb.angularVelocity.set(a[k + 11], a[k + 12], a[k + 13]);
+      pb._sleep = false; if (pb.userData) pb.userData.mdirty = true;
+    }
+    if (r.active >= 0) activeCount = r.active;
+    const h = r.hits;
+    for (let k = 0; k < h.length; k += 3) onHit(h[k] >= 0 ? byId.get(h[k]) : undefined, h[k + 1] >= 0 ? byId.get(h[k + 1]) : undefined, h[k + 2]);
   }
-  // the pose to draw: blended between the last two fixed steps (alpha 0 = previous step, 1 = latest)
+  // advance the simulation n fixed steps. On the main thread this happens now; with a worker the steps are sent
+  // off and their result is taken in on a later frame (the game draws the latest pose it has).
+  function advance(n, dt, onHit) {
+    if (!wk) {
+      for (let i = 0; i < n; i++) { cmds.push(['step', 1, dt]); const r = engine.run(cmds); cmds = []; apply(r, onHit); }
+      return n;
+    }
+    let got = 0;
+    if (pending) { const r = pending; pending = null; apply(r, onHit); got = r.steps; }
+    owed = Math.min(owed + n, 4);
+    if (!inFlight && owed) { cmds.push(['step', owed, dt]); wk.postMessage({ t: 'run', cmds, seq: ++seq }); cmds = []; owed = 0; inFlight = true; }
+    return got;   // steps whose results arrived this frame
+  }
+
+  // the pose to draw: blended between the last two steps (alpha 0 = previous step, 1 = latest)
   function renderPose(pb, alpha, outP, outQ) {
     const p = pb.position, q = pb.quaternion;
     if (pb._step !== stepNo || alpha >= 1) { outP.set(p.x, p.y, p.z); outQ.set(q.x, q.y, q.z, q.w); return; }
@@ -143,6 +143,33 @@ export function makePhysics(RAPIER) {
     const x = b.x * k + q.x * sg, y = b.y * k + q.y * sg, z = b.z * k + q.z * sg, w = b.w * k + q.w * sg, l = Math.hypot(x, y, z, w) || 1;
     outQ.set(x / l, y / l, z / l, w / l);
   }
-  function* awake() { for (const pb of rbMap.values()) if (!pb._sleep) yield pb; }
-  return { world, ground, PBody, step, renderPose, awake, get stepNo() { return stepNo; }, get activeCount() { return activeCount; }, bodies: () => rbMap.values(), setIterations(n) { world.numSolverIterations = n; } };
+  function* awake() { for (const pb of byId.values()) if (!pb._sleep) yield pb; }
+
+  return {
+    PBody, advance, step: (dt, onHit) => advance(1, dt, onHit), renderPose, awake,
+    mode: wk ? 'worker' : 'main',
+    get stepNo() { return stepNo; }, get stepsTotal() { return stepsTotal; }, get activeCount() { return activeCount; }, get busy() { return inFlight; },
+    bodies: () => byId.values(),
+    setIterations(n) { if (n !== iters) { iters = n; cmds.push(['iters', n]); } },
+    // fixed joint between two bodies in the simulation (b null = the ground); returns a joint id
+    addJoint(a, b, la, fa, lb, fb) { const jid = nextJoint++; cmds.push(['joint', jid, a.id, b ? b.id : -1, la, fa, lb, fb]); return jid; },
+    removeJoint(jid) { cmds.push(['unjoint', jid]); },
+    // earthquake: the ground becomes a moving slab
+    quake(what, x = 0, y = 0, z = 0) { cmds.push(['quake', what, x, y, z]); }
+  };
+}
+
+function loadScript(url) {
+  if (self.TSEngine) return Promise.resolve();
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = () => rej(new Error('Physics engine failed to load')); document.head.appendChild(s); });
+}
+function startWorker(url) {
+  return new Promise((res, rej) => {
+    let w;
+    try { w = new Worker(url); } catch (e) { rej(e); return; }
+    const t = setTimeout(() => { w.terminate(); rej(new Error('Physics worker timed out')); }, 20000);
+    w.onmessage = e => { if (e.data.t === 'ready') { clearTimeout(t); w.onmessage = null; res(w); } else if (e.data.t === 'error') { clearTimeout(t); w.terminate(); rej(new Error(e.data.message)); } };
+    w.onerror = e => { clearTimeout(t); w.terminate(); rej(e.message ? new Error(e.message) : e); };
+    w.postMessage({ t: 'init' });
+  });
 }

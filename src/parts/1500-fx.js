@@ -188,6 +188,7 @@ function startClip() {
 function stopClip() { if (clipRec && clipRec.state !== 'inactive') clipRec.stop(); }
 $('clipSave').onclick = async () => {
   if (!clipBlob) return;
+  track('share_clip');
   const ext = clipBlob.type.includes('mp4') ? 'mp4' : 'webm', name = `tower-smash-${Date.now()}.${ext}`;
   const dl = await (downloadsP || (downloadsP = useCap('downloads')));
   try {

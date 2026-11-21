@@ -22,3 +22,11 @@ Tower Smash is one web page. `build.mjs` joins `src/parts/*.js` in name order in
 - **One challenge engine.** Campaign, challenges, daily, duels and the Training Yard are all `startChallenge(def)` with a goal, ammo and `onResult`.
 - **Saving.** One `ts_save` record with a version number and `migrateSave()`; other `ts_*` keys hold stars, save slots and the free-play autosave. Export/import moves all of them as one code.
 - **Testing hooks.** `window.__game` exists only with `?debug` or under automated tests.
+
+## Physics engine layer (0.10)
+
+- `src/engine.js` owns the Rapier world and nothing else. It takes a list of commands (`add`, `rm`, `wake`, `imp`, `joint`, `quake`, `step`, ...) and returns packed poses for awake bodies plus the collisions that started (with impact speed from pre-step velocities).
+- `src/engine-entry.js` is bundled on its own (with Rapier) and embedded in the page as text (`#engineSrc`). The same copy starts either as a **Web Worker** (`?worker=1`, or Settings → Background physics) or as a main-thread script.
+- `src/phys.js` is the game's side: `PBody` is a proxy with a cached pose; changes are queued as commands. `P.advance(n, STEP, onHit)` runs n fixed steps (main thread: now; worker: sent off, results taken in on a later frame) and returns how many steps' results arrived.
+- The loop (`1700-loop.js`) uses a fixed 1/60 s accumulator; drawing blends between the last two steps (`physAlpha`, `P.renderPose`). Game time (`simTime`) advances only by simulated steps, so timers stay in step with the blocks.
+- Never call Rapier from game code: add a command to `engine.js` and a method to the `P` object instead.

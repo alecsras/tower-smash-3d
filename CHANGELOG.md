@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 — Phase 2, Milestone 1: performance core
+
+- Fixed 60 Hz physics: the simulation always advances in exact 1/60 s steps, and drawing blends between steps, so 120 Hz screens and slow-motion stay smooth and slow phones behave the same as fast ones. Game timers (fuses, debris, breakage) follow the physics actually simulated.
+- New physics engine layer: Rapier runs behind a small command protocol (engine.js) that works either on the main thread or in a Web Worker. Bonds and earthquakes no longer touch the engine directly.
+- Background physics (beta): Settings → Graphics. In a 5,000-block collapse the main thread stays near 50 fps (it was under 5 fps in the same test). Off by default until real-phone numbers confirm it.
+- Performance and usage stats: typical and slowest fps, worst frame, peak awake blocks, physics speed and a few key moments are counted on the device and included in feedback reports. Nothing is sent anywhere.
+- Tests: worker mode (castle hit, Metropolis standing, earthquake with fused blocks) in Chrome and the iPhone engine; stability at 30 fps; stats in the report.
+
 ## 0.9.5 — ~1,000-block builds, material themes, steadier stacks
 
 - Five new mega builds near 1,000 blocks: Sky Tower (972), Great Wall (883), Grand Arena (908), Desert Ziggurat (910) and Stone Viaduct (1,036). Mega builds are now listed smallest to largest.

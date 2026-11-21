@@ -122,6 +122,9 @@ function openSettings() {
     for (const [k, t] of [['auto', 'Auto'], ['high', 'High'], ['low', 'Light']]) { const b = document.createElement('button'); b.textContent = t; b.className = SAVE.qmode === k ? 'on' : '';
       b.onclick = () => { SAVE.qmode = k; if (k !== 'auto') SAVE.quality = k; else SAVE.quality = matchMedia('(pointer:coarse)').matches ? 'low' : 'high'; gov.done = k !== 'auto'; persist(); applyQuality(); openSettings(); }; s.appendChild(b); }
     B.appendChild(s); B.insertAdjacentHTML('beforeend', '<div class="sub" style="margin:0 2px">Auto starts light on phones and adjusts if the game slows down. High adds glow to fire, explosions and night windows.</div>'); }
+  tog('workerChk', 'Background physics (beta)', 'Runs physics on a separate thread so the screen stays smooth in huge collapses. Reloads the game.', !!SAVE.physWorker, async v => {
+    SAVE.physWorker = v; persist();
+    if (await confirmDlg('Reload now?', 'Background physics takes effect after a reload. Your progress is saved.', 'Reload')) location.reload(); });
   lab('Controls');
   tog('arrowChk', 'Camera arrows', 'Show ◀ ▶ buttons for turning the camera with one hand', SAVE.camArrows, v => { SAVE.camArrows = v; persist(); document.body.classList.toggle('camarrows', v); });
   lab('You');
@@ -216,7 +219,7 @@ function buildReport(note) {
   const ctx = chal ? `level: ${chal.def.title}` : screen !== 'game' ? `screen: ${screen}` : `free play, ${mode === 'build' ? 'Build' : 'Smash'} mode`;
   return [`**${fbType}** — Tower Smash 3D ${VERSION_STR} (${BUILD_INFO.commit})`, '', note || '(no note)', '', '---',
     `Device: ${deviceLine()}`, `Graphics: ${SAVE.quality} (${SAVE.qmode}) · ~${fpsAvg ? Math.round(fpsAvg) : '?'} fps · ${objs.filter(o => !o.gone).length} objects`,
-    `Where: ${ctx}`, lastError ? `Error: ${lastError}` : null, '', 'Recent activity:', ...ACT.slice(-20).map(a => '  ' + a)].filter(x => x !== null).join('\n');
+    perfLine(), statsLine(), `Where: ${ctx}`, lastError ? `Error: ${lastError}` : null, '', 'Recent activity:', ...ACT.slice(-20).map(a => '  ' + a)].filter(x => x !== null).join('\n');
 }
 function openFeedback(prefill) {
   const B = $('fbBody'); B.innerHTML = '';

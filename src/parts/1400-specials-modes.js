@@ -188,10 +188,8 @@ function startQuake() {
   if (quake) return;
   for (const o of objs) if (o.dormant) activate(o);
   wakeAll();
-  const kin = P.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0, 0));
-  P.world.createCollider(RAPIER.ColliderDesc.cuboid(300, .5, 300).setTranslation(0, -.5, 0).setFriction(.95), kin);
-  P.ground.setEnabled(false);
-  quake = { t0: simTime, dur: 5.5, kin, nextWake: 0 };
+  P.quake('start');
+  quake = { t0: simTime, dur: 5.5, nextWake: 0 };
   snd.quake(); toast('🌍 Earthquake!');
 }
 function updateQuake() {
@@ -200,13 +198,13 @@ function updateQuake() {
   const ox = A * Math.sin(t * 2 * Math.PI * 2.3) + A * .5 * Math.sin(t * 2 * Math.PI * 3.9 + 1);
   const oz = A * Math.sin(t * 2 * Math.PI * 1.8 + 2) + A * .4 * Math.sin(t * 2 * Math.PI * 4.4);
   const oy = .07 * env * Math.sin(t * 2 * Math.PI * 6.1);
-  quake.kin.setNextKinematicTranslation({ x: ox, y: oy, z: oz });
+  P.quake('move', ox, oy, oz);
   groundMesh.position.set(ox, oy, oz); pad.position.set(ox, -.06 + .025 + oy, oz); if (grid) grid.position.set(ox, .005 + oy, oz);
   shake = Math.max(shake, .22 * env);
   if (simTime > quake.nextWake) { quake.nextWake = simTime + .4; wakeAll();
     for (let i = 0; i < 12; i++) spawnP(rand(-buildR, buildR), .1, rand(-buildR, buildR), rand(-1, 1), rand(.5, 2), rand(-1, 1), 1.4, [.6, .52, .4], rand(.6, 1.2), 0, 1.5, .5); }
   if (t >= quake.dur) {
-    P.world.removeRigidBody(quake.kin); P.ground.setEnabled(true); quake = null;
+    P.quake('end'); quake = null;
     groundMesh.position.set(0, 0, 0); pad.position.set(0, -.06 + .025, 0); if (grid) grid.position.set(0, .005, 0);
   }
 }
@@ -438,7 +436,7 @@ function finishChallenge() {
   $('rLevels').onclick = () => { $('result').classList.remove('open'); out.back ? out.back() : openLevels(); };
   $('rHome').onclick = () => { $('result').classList.remove('open'); goHome(); }; $('rHome').style.display = out.back ? 'none' : '';
   $('rReplay').style.display = rec.frames.length > 20 ? '' : 'none'; $('rReplay').onclick = () => { $('result').classList.remove('open'); startReplay(false); };
-  logAct(`result ${d.title} ${stars}★ ${win ? 'win' : 'lose'}`);
+  track(win ? 'level_win' : 'level_lose'); logAct(`result ${d.title} ${stars}★ ${win ? 'win' : 'lose'}`);
   const ex = $('rExtra'); ex.style.display = out.extra ? '' : 'none';
   if (out.extra) { ex.textContent = out.extra.label; ex.onclick = out.extra.onclick; }
   $('result').classList.add('open'); if (win) snd.ding();
@@ -639,7 +637,7 @@ function showShare(text, code) {
   $('shareCopyAll').onclick = () => copyText(`${text}\n${link}`);
   $('shareCopyCode').onclick = () => copyText(code);
   $('shareNative').style.display = navigator.share && !inFrame ? '' : 'none';
-  $('shareNative').onclick = () => navigator.share({ title: 'Tower Smash', text, url: link }).catch(() => {});
+  $('shareNative').onclick = () => { track('share_duel'); navigator.share({ title: 'Tower Smash', text, url: link }).catch(() => {}); };
   $('result').classList.remove('open'); $('duel').classList.add('open'); $('duelPanes').dataset.pane = 'share';
 }
 const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();

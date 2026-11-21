@@ -66,7 +66,7 @@ function finishTraining(skipped) {
   training = false; endCoach();
   const first = !SAVE.trained; SAVE.trained = true; SAVE.onboarded = true; persist();
   if (first && !skipped) addCoins(100, 'training');
-  logAct('training ' + (skipped ? 'skipped' : 'done'));
+  track(skipped ? 'training_skipped' : 'training_done'); logAct('training ' + (skipped ? 'skipped' : 'done'));
   $('result').classList.remove('open'); chal = null; document.body.classList.remove('inlevel');
   const C = $('introCard'); showScreen('intro');
   C.innerHTML = `<div class="art" style="background:linear-gradient(135deg,#ffe4b8,#ffc56b)">🎓</div><h2>${skipped ? 'Training skipped' : 'Training complete!'}</h2><p>${skipped ? 'You can replay it any time from Settings.' : 'You earned 100 coins. Spend them on new weapons in the Armory.'}</p><div class="row" style="flex-direction:column"></div>`;

@@ -1,6 +1,6 @@
 {
   "name": "tower-smash-3d",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "private": true,
   "description": "Mobile 3D physics destruction game: build towers (up to 12,000 blocks) and smash them.",
   "type": "module",

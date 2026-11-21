@@ -1,6 +1,7 @@
 // Builds one self-contained page (dist/index.html):
 //   src/parts/*.js   joined in name order (one shared scope) and bundled with esbuild
 //   src/styles/*.css joined in name order, with the bundled font inlined
+//   src/engine-entry.js  the physics engine, bundled separately and embedded as text
 // plus the static files in public/ (manifest, service worker, icons, tester pages).
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, cpSync, readdirSync } from 'node:fs';
@@ -19,6 +20,10 @@ const out = await build({
   define: { __BUILD__: JSON.stringify(BUILD) }
 });
 const js = out.outputFiles[0].text.replace(/<\/script/g, '<\\/script');
+// the physics engine (Rapier + engine.js) is its own bundle, embedded once as text: it starts either as a Web Worker
+// or as a main-thread script from the same copy (see phys.js)
+const eng = await build({ entryPoints: ['src/engine-entry.js'], bundle: true, minify: prod, format: 'iife', target: 'es2020', write: false, logLevel: 'error' });
+const engineJs = eng.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 
 const font = w => readFileSync(`node_modules/@fontsource/nunito/files/nunito-latin-${w}-normal.woff2`).toString('base64');
 const fontCss = [700, 800, 900].filter(w => { try { font(w); return true; } catch (e) { return false; } })
@@ -28,7 +33,8 @@ const css = fontCss + '\n' + readdirSync('src/styles').filter(f => f.endsWith('.
 const html = readFileSync('src/index.template.html', 'utf8')
   .replace('/*STYLES*/', () => css)
   .replace('<script>/*BUNDLE*/</script>', '<script type="module">/*BUNDLE*/</script>')
-  .replace('/*BUNDLE*/', () => js);
+  .replace('/*BUNDLE*/', () => js)
+  .replace('</body>', () => `<script type="text/plain" id="engineSrc">${engineJs}</script>\n</body>`);
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', html);
 cpSync('public', 'dist', { recursive: true });

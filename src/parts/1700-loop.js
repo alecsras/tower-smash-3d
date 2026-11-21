@@ -16,8 +16,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) last
 function tick(now) {
   if (document.hidden) { requestAnimationFrame(tick); return; }
   const rawDt = Math.min(.05, (now - last) / 1000); last = now;
-  fpsAvg = fpsAvg ? fpsAvg * .95 + (1 / Math.max(rawDt, .001)) * .05 : 60;
-  if (DEBUG && (fpsT = (fpsT || 0) + rawDt) > .5) { fpsT = 0; $('fps').textContent = `${Math.round(fpsAvg)} fps · ${P.activeCount} awake · ${objs.length} obj · ${bonds.size} bonds`; }
+  fpsAvg = fpsAvg ? fpsAvg * .95 + (1 / Math.max(rawDt, .001)) * .05 : 60; perfFrame(rawDt);
+  if (DEBUG && (fpsT = (fpsT || 0) + rawDt) > .5) { fpsT = 0; $('fps').textContent = `${Math.round(fpsAvg)} fps · ${P.activeCount} awake · ${objs.length} obj · ${P.mode} physics · ${bonds.size} bonds`; }
   if (screen !== 'game') cam.tTheta += rawDt * .07;
   if (replay) {
     physAlpha = 1;   // replays place bodies directly: draw exactly what they set
@@ -26,16 +26,24 @@ function tick(now) {
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
   const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
-  prof('frame'); preActivate(); dominoAssist(); updateFields(dt); prof('pre');
+  prof('frame'); preActivate(); dominoAssist();
+  let n = 0, applied = 0;
   if (dt > 0) {
-    physAcc += dt; let n = 0;
-    while (physAcc >= STEP - 1e-7 && n < MAX_STEPS) { P.step(STEP, onHit); physAcc -= STEP; n++; }
+    physAcc += dt;
+    while (physAcc >= STEP - 1e-7 && n < MAX_STEPS) { physAcc -= STEP; n++; }
     if (physAcc > STEP) physAcc = STEP * .999;   // overloaded: let the simulation fall behind rather than spiral
-    physAlpha = physAcc / STEP;
-    if (!n) for (const pb of P.awake()) if (pb.userData) pb.userData.mdirty = true;   // no step this frame: still re-blend
   }
-  simTime += dt; prof('physics');
-  processFractures(); updateFire(); prof('fx-logic');
+  updateFields(n * STEP); prof('pre');
+  if (dt > 0) {
+    applied = P.advance(n, STEP, onHit);
+    physAlpha = physAcc / STEP;
+    if (!applied) for (const pb of P.awake()) if (pb.userData) pb.userData.mdirty = true;   // no new poses this frame: still re-blend
+  }
+  // game time follows the physics actually simulated, so fuses, debris lifetimes and breakage stay in step with
+  // the blocks even when physics (in a worker, or on a busy phone) falls behind the screen
+  simTime += applied * STEP; prof('physics');
+  if (applied) processFractures();
+  updateFire(); prof('fx-logic');
   // events
   if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }
   for (const o of objs) {

@@ -12,7 +12,6 @@ const BOND = {
 const BOND_MODES = ['glue', 'weld', 'anchor', 'cut'];
 let bondMode = 'weld';
 const bonds = new Set();
-const groundRB = P.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
 const _bv = new THREE.Vector3();
 const tq = q => new THREE.Quaternion(q.x, q.y, q.z, q.w);
 const worldAnchor = (pb, local) => _bv.copy(local).applyQuaternion(tq(pb.quaternion)).add(pb.position).clone();
@@ -36,12 +35,11 @@ function addBond(a, b, kind, at) {
   return bond;
 }
 function ensureJoint(bond) {
-  if (bond.joint || !bond.a.body.rb || (bond.b && !bond.b.body.rb)) return;
-  const v = p => ({ x: p.x, y: p.y, z: p.z }), r = q => ({ x: q.x, y: q.y, z: q.z, w: q.w });
-  const data = RAPIER.JointData.fixed(v(bond.la), r(bond.fa), v(bond.lb), r(bond.fb));
-  bond.joint = P.world.createImpulseJoint(data, bond.a.body.rb, bond.b ? bond.b.body.rb : groundRB, false);
+  if (bond.joint || !bond.a.body.inWorld || (bond.b && !bond.b.body.inWorld)) return;
+  const v = p => [p.x, p.y, p.z], r = q => [q.x, q.y, q.z, q.w];
+  bond.joint = P.addJoint(bond.a.body, bond.b ? bond.b.body : null, v(bond.la), r(bond.fa), v(bond.lb), r(bond.fb));
 }
-function dropJoint(bond) { if (bond.joint) { try { P.world.removeImpulseJoint(bond.joint, true); } catch (e) {} bond.joint = null; } }
+function dropJoint(bond) { if (bond.joint) { P.removeJoint(bond.joint); bond.joint = null; } }
 function dropJointsOf(o) { if (o.bonds) for (const b of o.bonds) dropJoint(b); }
 function removeBond(bond, fx) {
   if (!bonds.has(bond)) return; dropJoint(bond); bonds.delete(bond); bondsDirty = true;
@@ -113,7 +111,7 @@ function updateBonds(dt) {
   bondCheckT += dt;
   if (bondCheckT > .05) { bondCheckT = 0;
     for (const b of [...bonds]) {
-      if (!b.joint) { if (b.a.body.rb && (!b.b || b.b.body.rb)) ensureJoint(b); continue; }
+      if (!b.joint) { if (b.a.body.inWorld && (!b.b || b.b.body.inWorld)) ensureJoint(b); continue; }
       if (b.a.body.isSleeping() && (!b.b || b.b.body.isSleeping())) continue;
       const pa = worldAnchor(b.a.body, b.la), pb = b.b ? worldAnchor(b.b.body, b.lb) : b.lb;
       if (pa.distanceTo(pb) > BOND[b.kind].drift) removeBond(b, true);

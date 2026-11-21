@@ -46,3 +46,20 @@ test('save export and import round trip', async ({ page }) => {
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ts_save')).coins)).toBe(4321);
   expect(await page.evaluate(() => window.__game.importSave('garbage'))).toBe(false);
 });
+
+test('performance and usage stats land in the feedback report; background physics setting exists', async ({ page }) => {
+  const errors = await open(page);
+  const r = await page.evaluate(async () => {
+    const g = window.__game; g.loadPreset(g.PRESETS.find(p => p.id === 'castle')); g.setMode('throw');
+    g.throwAt('ball', 0, 2, 0, .8);
+    for (let i = 0; i < 40 && !g.perfSummary(); i++) await new Promise(res => setTimeout(res, 250));
+    g.openSettings();
+    return { report: g.buildReport('test'), perf: g.perfSummary(), toggle: !!document.getElementById('workerChk'), stats: g.SAVE.stats };
+  });
+  expect(r.report).toContain('Performance:');
+  expect(r.report).toContain('physics main');
+  expect(r.report).toContain('first_throw 1');
+  expect(r.stats.session.n).toBeGreaterThan(0);
+  expect(r.toggle).toBe(true);
+  expect(errors).toEqual([]);
+});

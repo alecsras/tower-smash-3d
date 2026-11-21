@@ -1,5 +1,10 @@
 // ================= physics =================
-const P = makePhysics(RAPIER);
+// The engine (Rapier 0.14 + engine.js) is embedded as text; it runs in a Web Worker when enabled, else on the main thread.
+const PHYS_WORKER = /[?&]worker=1\b/.test(location.search) || (SAVE.physWorker === true && !/[?&]worker=0\b/.test(location.search));
+bootStep(.55, 'Starting the physics engine…');
+let P;
+try { P = await makePhysics({ src: document.getElementById('engineSrc').textContent, worker: PHYS_WORKER }); } catch (e) { bootFail(); throw e; }
+bootStep(.8, 'Raising the castle…');
 
 // ---- Dormant blocks: resting pieces far from any action are drawn but NOT simulated. ----
 // They sit in a spatial hash and join the physics world (still asleep) the moment anything

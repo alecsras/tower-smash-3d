@@ -38,6 +38,8 @@ function throwProj(vel, target, pw = 1) {
   const ok = useAmmo();
   if (ok === false && chal && !chal.ammo.some(q => q.n > 0) && !(chal.pool && chal.pool.n > 0)) toast('Out of shots — tap Restart to try again', 'warn');
   if (!ok) return;
+  if (!(SAVE.stats && SAVE.stats.throw)) track('first_throw');
+  track('throw');
   coach('shoot'); const nBefore = objs.length;
   throwProj0(vel, target, pw);
   const o = objs.slice(nBefore).find(q => q.type === 'proj'); if (o) followShot(o); else { if (followOn && !homeTarget && mode === 'throw') homeTarget = cam.target.clone(); followBoom(target); }

@@ -26,7 +26,7 @@ function perfLine() {
 function track(name) {
   const st = SAVE.stats || (SAVE.stats = {}), e = st[name] || (st[name] = { n: 0, first: Date.now() });
   e.n++; e.last = Date.now(); clearTimeout(track.t); track.t = setTimeout(persist, 2000);
-  if (STATS_URL && navigator.sendBeacon) try { navigator.sendBeacon(STATS_URL, JSON.stringify({ e: name, v: VERSION_STR, d: deviceLine(), p: perfSummary() })); } catch (err) {}
+  if (STATS_URL && SAVE.shareStats !== false && navigator.sendBeacon) try { navigator.sendBeacon(STATS_URL, JSON.stringify({ e: name, v: VERSION_STR, d: deviceLine(), p: perfSummary() })); } catch (err) {}
 }
 function statsLine() {
   const st = SAVE.stats || {}, k = Object.keys(st); if (!k.length) return null;

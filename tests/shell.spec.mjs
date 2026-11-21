@@ -54,12 +54,13 @@ test('performance and usage stats land in the feedback report; background physic
     g.throwAt('ball', 0, 2, 0, .8);
     for (let i = 0; i < 40 && !g.perfSummary(); i++) await new Promise(res => setTimeout(res, 250));
     g.openSettings();
-    return { report: g.buildReport('test'), perf: g.perfSummary(), toggle: !!document.getElementById('workerChk'), stats: g.SAVE.stats };
+    return { report: g.buildReport('test'), perf: g.perfSummary(), toggle: !!document.getElementById('workerChk'), statsToggle: !!document.getElementById('statsChk'), stats: g.SAVE.stats };
   });
   expect(r.report).toContain('Performance:');
   expect(r.report).toContain('physics main');
   expect(r.report).toContain('first_throw 1');
   expect(r.stats.session.n).toBeGreaterThan(0);
   expect(r.toggle).toBe(true);
+  expect(r.statsToggle).toBe(true);
   expect(errors).toEqual([]);
 });

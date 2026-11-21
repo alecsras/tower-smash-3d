@@ -132,6 +132,7 @@ function openSettings() {
     r.querySelector('input').onchange = e => { SAVE.name = e.target.value.trim().slice(0, 16); persist(); const dn = $('duelName'); if (dn) dn.value = SAVE.name; }; B.appendChild(r); }
   B.appendChild(mkBtn('Hand', 'Replay the training', () => { $('settings').classList.remove('open'); startTraining(); }, { cls: 'mrow' }));
   tog('sandboxChk', 'Unlock everything (test option)', 'Every weapon free. Turn off to go back to earning them.', SAVE.sandbox, v => { SAVE.sandbox = v; persist(); buildUI(); });
+  tog('statsChk', 'Share anonymous stats', 'Frame rate, device type and play counts, with no name or saves. Helps us make the game smoother.', SAVE.shareStats !== false, v => { SAVE.shareStats = v; persist(); });
   lab('Your save');
   const g = document.createElement('div'); g.className = 'mgrid2'; B.appendChild(g);
   g.appendChild(mkBtn('Download', 'Export', async () => { const code = exportSave(); copyText(code);
@@ -199,7 +200,7 @@ function openHelp(tab) {
     card('Materials', 'stone wood glass marble concrete sand gold tnt steel brick ice rubber crystal obsidian — or striped, checker, random');
   } else {
     card('Tower Smash 3D', `Version ${VERSION_STR} · ${BUILD_INFO.commit}${BUILD_INFO.date ? ' · built ' + BUILD_INFO.date : ''}<br>This is a test build. Thanks for playing it!`);
-    card('Privacy', '<b>Your saves stay on this device.</b> Coins, stars, unlocks and builds are stored in your browser and never uploaded.<br><br><b>AI Architect</b> sends the words you type (or the photo you pick) to Claude to design the build.<br><br><b>Feedback</b> sends only what you choose to send: your note, plus the version, device type and the last few things you did in the game.<br><br>No accounts, no ads, no tracking, no analytics.');
+    card('Privacy', '<b>Your saves stay on this device.</b> Coins, stars, unlocks and builds are stored in your browser and never uploaded.<br><br><b>AI Architect</b> sends the words you type (or the photo you pick) to Claude to design the build.<br><br><b>Feedback</b> sends only what you choose to send: your note, plus the version, device type and the last few things you did in the game.<br><br><b>Anonymous stats</b> help us make the game smoother: frame rate, device type, and counts like sessions, throws and levels won. No name, no saves, no contact details. Today they stay on this device and only leave inside a feedback report you choose to send. You can turn them off in Settings.<br><br>No ads, and no accounts needed.');
     card('Made with', 'three.js (3D), Rapier (physics), Lucide (icons), Nunito (font). Built with Claude.');
     const b = mkBtn('Github', 'Project on GitHub', () => window.open(REPO_URL, '_blank'), { cls: 'mrow' }); b.style.marginTop = '8px'; B.appendChild(b);
   }

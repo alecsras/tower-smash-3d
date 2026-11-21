@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0 — Phase 2, Milestone 2: feel and scoring
+
+- Destruction score: every toppled block scores by material and height, and chain reactions build a combo up to ×5. Live in the top bar, on level results, with a best score kept for every build and level.
+- Impact feel: dust where heavy blocks hit the ground, a camera kick on big direct hits, and a beat of slow-motion with a rumble when a chain reaction takes off.
+- Rubble settles: blocks that come to rest freeze into scenery until something hits them, so big collapses stop costing physics time. After a 5,000-block Citadel collapse, physics work drops about 20× within 20 seconds.
+- Graphics tiers: High, Balanced and a new Light tier for older phones (no shadows, fewer effects). Auto picks one for your device and steps down if the game slows.
+- Faster start: shaders compile behind the loading screen; shorter fade.
+- Privacy: Settings → Share anonymous stats (on by default, nothing is sent yet), plus a clear note in Help → About & privacy.
+
 ## 0.10.0 — Phase 2, Milestone 1: performance core
 
 - Fixed 60 Hz physics: the simulation always advances in exact 1/60 s steps, and drawing blends between steps, so 120 Hz screens and slow-motion stay smooth and slow phones behave the same as fast ones. Game timers (fuses, debris, breakage) follow the physics actually simulated.

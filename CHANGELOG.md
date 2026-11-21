@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 — Phase 2, Milestone 3: campaign, unlocks, engineer challenges
+
+- Campaign worlds: the 50 Blorb levels are now five worlds (Timber Town, Stone Valley, Concrete City, Marble Heights, Golden Citadel) that open at 0, 12, 30, 50 and 75 stars. Worlds you've already played stay open.
+- Five new demolition challenges on the ~1,000-block builds: Sky Tower Takedown, Wall Breaker, Arena Rumble, Ziggurat Blast and Bridge Down.
+- Unlocks: premium materials unlock with total stars (Brick 5, Ice 10, Marble 20, Rubber 30, Steel 45, Crystal 60, Gold 80, Obsidian 100), with a message when one opens.
+- Engineer challenges (Levels → Engineer): build at least a set height within a block budget, then an earthquake, boulders, a tornado or meteors test it. Stars for how much is still standing.
+
 ## 0.11.0 — Phase 2, Milestone 2: feel and scoring
 
 - Destruction score: every toppled block scores by material and height, and chain reactions build a combo up to ×5. Live in the top bar, on level results, with a best score kept for every build and level.

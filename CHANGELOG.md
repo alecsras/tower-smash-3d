@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.5 — ~1,000-block builds, material themes, steadier stacks
+
+- Five new mega builds near 1,000 blocks: Sky Tower (972), Great Wall (883), Grand Arena (908), Desert Ziggurat (910) and Stone Viaduct (1,036). Mega builds are now listed smallest to largest.
+- Material themes: pick a material in the Build Library (Original, Mixed, Stone, Wood, Glass, Ice, Steel, Gold, Marble, Brick, Concrete, Sand, Rubber, Crystal, Obsidian) and every build loads in it. In Build mode, More → Materials repaints whatever is on the pad, and Rebuild keeps the new material. TNT and dominoes keep their own material.
+- Steadier stacks everywhere: preset layers and hand-placed blocks now sit flush (they used to float 4–5 mm apart, so a woken stack free-fell layer by layer and slammed together — the main cause of blocks sinking and bouncing). The physics engine also notices contacts a little further out.
+- New tests: no overlapping blocks in any mega build, every new build stands with all blocks awake, material themes and the picker.
+
 ## 0.9.4 — Physics back to stable
 
 - Fixed blocks sinking into the floor, bouncing and shooting up in every build. The cause was the "settle-to-sleep" speed-up from 0.9.2, which is removed.

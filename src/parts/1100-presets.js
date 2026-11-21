@@ -1,5 +1,6 @@
 // ================= presets =================
-const G = 1.005, LAY = 1.004;
+// layers touch exactly: any vertical gap makes a woken stack free-fall layer by layer and slam together
+const G = 1.005, LAY = 1.0;
 const CUBE = m => Bx(m, 1, 1, 1);
 const PRESETS = [
   { id: 'castle', name: 'Grand Castle', emoji: '🏰', desc: 'Spired towers, gatehouse, battlements & a TNT keep', cam: [31, 3, .42], build() {
@@ -300,14 +301,126 @@ const MEGA = [
     }
   } }
 ];
+
+// ---- ~1,000-block builds: stacked grid pieces only (no overlaps), so nothing pops apart when it wakes ----
+const MEGA2 = [
+  { id: 'skytower', mega: true, arena: 11, name: 'Sky Tower', emoji: '🏙️', desc: 'A 24-story glass & steel office tower with corner pinnacles', cam: [50, 8, .3], build() {
+    // equal-sized cubes only (heavy floor plates make the columns buckle), and no taller than ~24 floors:
+    // taller hollow stacks slowly drift apart if the whole tower is ever awake at once
+    const n = 11;
+    for (let L = 0; L < 24; L++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      if (i > 0 && i < n - 1 && j > 0 && j < n - 1) continue;
+      const corner = (i === 0 || i === n - 1) && (j === 0 || j === n - 1), band = L % 5 === 4 || L < 2;
+      put(CUBE(corner ? 'steel' : band ? 'concrete' : 'glass'), (i - (n - 1) / 2) * G, L * LAY, (j - (n - 1) / 2) * G);
+    }
+    for (const sx of [-5, 5]) for (const sz of [-5, 5]) for (let L = 24; L < 27; L++) put(CUBE(L === 26 ? 'gold' : 'steel'), sx * G, L * LAY, sz * G);
+  } },
+  { id: 'greatwall', mega: true, arena: 22, name: 'Great Wall', emoji: '🧱', desc: 'A zigzag stone wall guarded by eight watchtowers', cam: [66, 2, .55], build() {
+    const pts = [[-20, -12], [-10, -12], [-10, -2], [0, -2], [0, 8], [10, 8], [10, -2], [20, -2]], used = new Set(), k = (x, z) => x + ',' + z;
+    const at = (sp, x, L, z) => put(sp, (x + .5) * G, L * LAY, (z + .5) * G);
+    for (const [cx, cz] of pts) {                       // 4x4 hollow towers centred on each corner
+      for (let L = 0; L < 6; L++) for (let i = -2; i <= 1; i++) for (let j = -2; j <= 1; j++) {
+        if (i > -2 && i < 1 && j > -2 && j < 1) continue;
+        at(CUBE(L === 3 && (i === -2 || i === 1) && (j === -1 || j === 0) ? 'glass' : 'stone'), cx + i, L, cz + j); }
+      for (let i = -2; i <= 1; i++) for (let j = -2; j <= 1; j++) used.add(k(cx + i, cz + j));
+      for (const [i, j] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) at(CUBE('stone'), cx + i, 6, cz + j);
+    }
+    for (let s = 0; s < pts.length - 1; s++) {          // 2-thick, 3-high wall with crenels between them
+      const [ax, az] = pts[s], [bx, bz] = pts[s + 1], dx = Math.sign(bx - ax), dz = Math.sign(bz - az), n = Math.abs(bx - ax) + Math.abs(bz - az);
+      for (let t = 0; t <= n; t++) for (const w of [-1, 0]) {
+        const x = ax + dx * t + (dz ? w : 0), z = az + dz * t + (dx ? w : 0);
+        if (used.has(k(x, z))) continue; used.add(k(x, z));
+        for (let L = 0; L < 3; L++) at(CUBE(L === 0 ? 'concrete' : 'stone'), x, L, z);
+        if (w === -1 && t % 2 === 0) at(CUBE('stone'), x, 3, z);
+      }
+    }
+    at(CUBE('tnt'), 0, 0, 8); at(CUBE('tnt'), -10, 0, -12);
+  } },
+  { id: 'stadium', mega: true, arena: 13, name: 'Grand Arena', emoji: '🏟️', desc: 'Five tiers of seats, four gates and floodlight towers', cam: [44, 2, .62], build() {
+    const seat = ['concrete', 'marble', 'concrete', 'marble', 'glass'];
+    for (let d = 6; d <= 10; d++) for (let x = -d; x <= d; x++) for (let z = -d; z <= d; z++) {
+      if (Math.max(Math.abs(x), Math.abs(z)) !== d || Math.min(Math.abs(x), Math.abs(z)) <= 1) continue;
+      for (let L = 0; L < d - 5; L++) put(CUBE(L === d - 6 ? seat[d - 6] : 'concrete'), x * G, L * LAY, z * G);
+    }
+    for (const sx of [-11, 11]) for (const sz of [-11, 11]) { for (let L = 0; L < 9; L++) put(CUBE('steel'), sx * G, L * LAY, sz * G); put(CUBE('glass'), sx * G, 9 * LAY, sz * G); }
+    for (let L = 0; L < 2; L++) for (const dx of [-.5, .5]) for (const dz of [-.5, .5]) put(CUBE(L ? 'gold' : 'tnt'), dx * G, L * LAY, dz * G);
+  } },
+  { id: 'ziggurat', mega: true, arena: 10, name: 'Desert Ziggurat', emoji: '🏜️', desc: 'Six sandstone steps with a TNT chamber hidden inside', cam: [40, 4, .42], build() {
+    let L = 0;
+    for (const n of [13, 11, 9, 7, 5, 3]) for (let h = 0; h < 2; h++, L++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const x = i - (n - 1) / 2, z = j - (n - 1) / 2, edge = i === 0 || j === 0 || i === n - 1 || j === n - 1;
+      const m = L === 1 && Math.abs(x) <= 1 && Math.abs(z) <= 1 ? 'tnt' : h === 1 && edge ? 'stone' : 'sand';
+      put(CUBE(m), x * G, L * LAY, z * G);
+    }
+    put(CUBE('gold'), 0, L * LAY, 0); put(Co('gold', .5, 1), 0, (L + 1) * LAY, 0);
+  } },
+  { id: 'viaduct', mega: true, arena: 17, name: 'Stone Viaduct', emoji: '🌉', desc: 'A two-tier aqueduct between two gate towers', cam: [48, 5, .32], build() {
+    // 4 deep and 13 high: thinner, taller walls sway along their narrow side and tip over once fully awake
+    const zs = [-1.5, -.5, .5, 1.5], D = zs.length, beam = n => Bx('stone', n * G - .005, 1, D * G - .005);
+    const cube = (m, x, L) => { for (const z of zs) put(CUBE(m), x * G, L * LAY, z * G); };
+    const pil = [-12, -6, 0, 6, 12], N = 26, X = c => -12.5 + c;
+    for (const p of pil) for (let L = 0; L < 6; L++) for (const dx of [-.5, .5]) cube('stone', p + dx, L);
+    for (let g = 0; g < pil.length - 1; g++) put(beam(6), (pil[g] + 3) * G, 6 * LAY, 0);
+    cube('stone', X(0), 6); cube('stone', X(N - 1), 6);
+    for (let c = 0; c < N; c++) cube('concrete', X(c), 7);
+    // upper arcade: 2-wide piers with 1-wide windows; 3-long lintels each rest on two piers, so no course has holes
+    for (let c = 0; c < N; c++) if (c % 3 !== 2) for (let L = 8; L < 11; L++) cube('stone', X(c), L);
+    for (let c = 1; c + 2 < N; c += 3) put(beam(3), X(c + 1) * G, 11 * LAY, 0);
+    cube('stone', X(0), 11); cube('stone', X(N - 1), 11);
+    for (let c = 0; c < N; c++) cube('concrete', X(c), 12);
+    for (let c = 0; c < N; c++) for (const z of zs) put(CUBE(Math.abs(z) > 1 ? 'stone' : 'glass'), X(c) * G, 13 * LAY, z * G);
+    for (const sx of [-1, 1]) for (let L = 0; L < 10; L++) for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      if (i > 0 && i < 3 && j > 0 && j < 3) continue;
+      put(CUBE(L % 5 === 4 ? 'wood' : 'stone'), sx * (13.5 + i) * G, L * LAY, (j - 1.5) * G);
+    }
+  } }
+];
+MEGA.push(...MEGA2);
 PRESETS.unshift(...MEGA);
+
+// ---- material themes: load a preset (or repaint what's on the pad) in one material ----
+const MAT_THEMES = [['original', 'Original'], ['mixed', 'Mixed'], ['stone', 'Stone'], ['wood', 'Wood'], ['glass', 'Glass'], ['ice', 'Ice'], ['steel', 'Steel'], ['gold', 'Gold'],
+  ['marble', 'Marble'], ['brick', 'Brick'], ['concrete', 'Concrete'], ['sand', 'Sand'], ['rubber', 'Rubber'], ['crystal', 'Crystal'], ['obsidian', 'Obsidian']];
+const THEME_KEEP = new Set(['tnt', 'domino']);   // these keep their job: TNT still explodes, dominoes still topple
+const THEME_MIX = ['stone', 'wood', 'glass', 'marble', 'brick', 'steel', 'gold', 'crystal', 'ice', 'rubber', 'obsidian', 'concrete', 'sand'];
+let buildTheme = null;
+const themeName = t => (MAT_THEMES.find(m => m[0] === t) || MAT_THEMES[0])[1];
+// spec.base remembers the material the piece was designed with, so 'original' always restores it
+function themeSpec(spec, theme) {
+  const base = spec.base || spec.mat;
+  if (THEME_KEEP.has(base)) return spec;
+  const mat = theme === 'original' ? base : theme === 'mixed' ? THEME_MIX[Math.floor(Math.random() * THEME_MIX.length)] : theme;
+  if (mat === spec.mat) return spec;
+  const out = { ...spec, mat }; if (mat !== base) out.base = base; else delete out.base; return out;
+}
+function repaintPad(theme) {
+  const blocks = objs.filter(o => !o.gone && o.type === 'block');
+  if (!blocks.length) { toast('Nothing on the pad to repaint yet'); return; }
+  const data = blocks.map(o => ({ spec: themeSpec(o.spec, theme), p: o.body.position.clone(), q: o.body.quaternion.clone(), home: o.home })), saved = bondsFor(blocks);
+  const keep = snapshot;
+  clearAll();
+  const made = data.map(d => { const o = createPiece(d.spec, d.p.x, d.p.y, d.p.z, d.q, true); if (d.home) o.home = d.home; return o; });
+  restoreBonds(made, saved);
+  if (keep) { snapshot = keep; for (const s of snapshot) s.spec = themeSpec(s.spec, theme); }   // Rebuild comes back in the new material
+  else dirty = true;
+  shadowDirty = 2; updateHud(); toast(theme === 'original' ? 'Back to the original materials' : 'Repainted in ' + themeName(theme).toLowerCase());
+  logAct('repaint ' + theme);
+}
+function themeChips(cur, onPick) {
+  const row = document.createElement('div'); row.className = 'chips mats';
+  for (const [k, label] of MAT_THEMES) { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.textContent = label; b.onclick = () => onPick(k); row.appendChild(b); }
+  return row;
+}
 function countOf(p) { if (p.count == null) { COUNTING = 0; p.build(); p.count = COUNTING; COUNTING = null; } return p.count; }
 function clearAll() { clearFields(); for (const o of objs) removeObj(o); dormant.clear(); objs = []; placed = []; redoStack = []; clearGhost(); pendingBreak.clear(); pendingBoom = []; parts = []; }
 function loadPreset(p) {
-  clearAll(); setArena(p.arena || 10); p.build(); dirty = true; snapshot = null; curPreset = p;
+  clearAll(); setArena(p.arena || 10);
+  buildTheme = SAVE.matTheme && SAVE.matTheme !== 'original' ? SAVE.matTheme : null;
+  try { p.build(); } finally { buildTheme = null; }
+  dirty = true; snapshot = null; curPreset = p;
   const [r, y, el] = p.cam; cam.tR = r; cam.target.y = y; cam.tEl = el;
   if (mode === 'throw') takeSnapshot();
-  updateHud(); hideHint('build'); toast(p.emoji + ' ' + p.name + ' · ' + countOf(p) + ' blocks');
+  updateHud(); hideHint('build'); toast(p.emoji + ' ' + p.name + ' · ' + countOf(p) + ' blocks' + (SAVE.matTheme && SAVE.matTheme !== 'original' ? ' · ' + themeName(SAVE.matTheme) : ''));
 }
 let curPreset = null;
 function takeSnapshot() {
@@ -329,7 +442,9 @@ function rebuild() {
 function openMenu() { openLibrary('mega'); }
 function renderMega() {
   const g = $('mgrid'); g.innerHTML = '';
-  for (const [title, list] of [['Mega builds · 500–5,000 blocks', PRESETS.filter(p => p.mega)], ['Classic builds', PRESETS.filter(p => !p.mega)]]) {
+  const mh = document.createElement('div'); mh.className = 'sect'; mh.textContent = 'Material · builds load in this'; g.appendChild(mh);
+  g.appendChild(themeChips(SAVE.matTheme || 'original', k => { SAVE.matTheme = k; persist(); renderMega(); }));
+  for (const [title, list] of [['Mega builds · 500–5,000 blocks', PRESETS.filter(p => p.mega).sort((a, b) => countOf(a) - countOf(b))], ['Classic builds', PRESETS.filter(p => !p.mega)]]) {
     const h = document.createElement('div'); h.className = 'sect'; h.textContent = title; g.appendChild(h);
     for (const p of list) {
       const b = document.createElement('button'); b.className = 'card' + (p.mega ? ' mega' : '');

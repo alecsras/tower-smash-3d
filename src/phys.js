@@ -27,6 +27,8 @@ export class Q4 {
 export function makePhysics(RAPIER) {
   const world = new RAPIER.World({ x: 0, y: GRAV, z: 0 });
   world.numSolverIterations = 4;
+  // notice contacts up to 6 mm away, so a block resting a hair above another never free-falls onto it
+  world.integrationParameters.normalizedPredictionDistance = .006;
   const queue = new RAPIER.EventQueue(true);
   const rbMap = new Map(), colMap = new Map();
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));

@@ -136,3 +136,4 @@ button,.item,.tl,.chip,.tile,.mrow,label.tog{touch-action:manipulation;-webkit-t
 .item.empty{opacity:.45;filter:grayscale(.7)}
 .item:active{transform:scale(.94)}
 @supports (height:100dvh){ .sheet{max-height:92dvh} }
+#mgrid .chips.mats,#moreList .chips.mats{grid-column:1/-1;margin:2px 0 10px}#moreList .chips.mats{padding:4px 12px}

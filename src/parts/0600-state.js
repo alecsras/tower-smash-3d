@@ -24,6 +24,6 @@ function createPiece(spec, x, y, z, quat, sleep) {
 const qY = a => a ? Q4.yaw(a) : null;
 // place a piece by the height of its BOTTOM
 let COUNTING = null;
-function put(spec, x, yBase, z, rotY) { if (COUNTING !== null) { COUNTING++; return null; } return createPiece(spec, x, yBase + specHeight(spec) / 2 + .003, z, qY(rotY), true); }
+function put(spec, x, yBase, z, rotY) { if (COUNTING !== null) { COUNTING++; return null; } if (buildTheme) spec = themeSpec(spec, buildTheme); return createPiece(spec, x, yBase + specHeight(spec) / 2 + .0005, z, qY(rotY), true); }
 function syncMesh(o) { if (!o.mesh) return; o.mesh.position.copy(o.body.position); o.mesh.quaternion.copy(o.body.quaternion); }
 

@@ -285,6 +285,11 @@ function openMore() {
   const add = (icon, label, note, fn, cls = '') => { const b = mkBtn(icon, label, fn, { cls: 'mrow ' + cls }); if (note) b.insertAdjacentHTML('beforeend', `<small>${note}</small>`); L.appendChild(b); };
   add('ArrowUpDown', 'Layer height', `${HEIGHTS[toolH]} high`, () => { toolH = (toolH + 1) % HEIGHTS.length; renderToolbar(); openMore(); });
   add('FlipHorizontal2', 'Mirror', mirrorX ? 'On' : 'Off', () => { mirrorX = !mirrorX; renderToolbar(); openMore(); });
+  add('Palette', 'Materials', 'Repaint everything on the pad', () => {
+    L.innerHTML = ''; add('ChevronLeft', 'Back', '', openMore);
+    const h = document.createElement('div'); h.className = 'sect'; h.textContent = 'Repaint the pad in…'; L.appendChild(h);
+    L.appendChild(themeChips(null, k => { $('more').classList.remove('open'); repaintPad(k); }));
+  });
   add('Scale', 'Test gravity', 'Undo puts it back', () => { $('more').classList.remove('open'); testGravity(); });
   add('Construction', 'Add supports', 'Pillars under overhangs', () => { $('more').classList.remove('open'); autoSupport(); });
   add('Trash2', 'Clear the pad', '', async () => { $('more').classList.remove('open'); if (await confirmDlg('Clear the pad?', 'Every block on the pad will be removed. You can undo this.', 'Clear', { danger: true })) { clearAll(); snapshot = null; dirty = true; updateHud(); } }, 'danger');

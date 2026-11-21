@@ -56,7 +56,7 @@ function strokePlan(a, b) {
   const hm = new Map();
   for (const [x, z] of cells) {
     let { top } = topAt(x, z, f.fx, f.fz, stroke.cache);
-    for (let L = 0; L < layers && plan.length < STROKE_CAP; L++) { if (top + f.hgt > MAX_H) break; plan.push([x, top, z]); top += f.hgt + .005; }
+    for (let L = 0; L < layers && plan.length < STROKE_CAP; L++) { if (top + f.hgt > MAX_H) break; plan.push([x, top, z]); top += f.hgt + .0005; }
   }
   return plan;
 }
@@ -105,7 +105,7 @@ function toolUp(moved) {
   const plan = strokePlan(stroke.a, stroke.b), f = stroke.a.frame, out = [];
   for (const [x, top, z] of plan) {
     if (duelBuild && duelUsed() + pieceCost(f.spec) > duelBuild.budget) { toast('Budget used up'); break; }
-    out.push(createPiece(f.spec, x, top + f.hgt / 2 + .005, z, qY(f.rot), true));
+    out.push(createPiece(f.spec, x, top + f.hgt / 2 + .0005, z, qY(f.rot), true));
   }
   clearGhost();
   if (out.length) { out.forEach(o => { o.pop = 1; o.mdirty = true; }); pushHistory(out); dirty = true; snd.place(); toast(`🧱 +${out.length} blocks`); if (tool === 'line') coach('line'); }

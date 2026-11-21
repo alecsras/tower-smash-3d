@@ -1,5 +1,7 @@
 // ================= main loop =================
-const STEP = 1 / 60;
+// physics always advances in fixed 1/60 s steps; drawing blends between the last two steps (physAlpha)
+const STEP = 1 / 60, MAX_STEPS = 3;
+let physAcc = 0, physAlpha = 1;
 let awakeCount = 0, lastDeact = 0;
 let last = performance.now(), hudT = 0;
 const gov = { acc: 0, n: 0, slow: 0, done: !!(navigator.webdriver) || SAVE.qmode !== 'auto' };
@@ -18,13 +20,20 @@ function tick(now) {
   if (DEBUG && (fpsT = (fpsT || 0) + rawDt) > .5) { fpsT = 0; $('fps').textContent = `${Math.round(fpsAvg)} fps · ${P.activeCount} awake · ${objs.length} obj · ${bonds.size} bonds`; }
   if (screen !== 'game') cam.tTheta += rawDt * .07;
   if (replay) {
+    physAlpha = 1;   // replays place bodies directly: draw exactly what they set
     updateReplay(rawDt); updateParticles(rawDt * .55);
     if (flashT > 0) { flashT = Math.max(0, flashT - rawDt * 1.8); const s = 1 + (1 - flashT) * 4; flashMesh.scale.setScalar(s); flashMesh.material.opacity = flashT * .75; if (!flashT) flashMesh.visible = false; }
     flash.intensity *= Math.pow(.02, rawDt); applyCamera(rawDt); renderFrame(); requestAnimationFrame(tick); return;
   }
   const dt = paused ? 0 : rawDt * (slow ? .3 : 1) * (simTime < bulletUntil ? .35 : 1);
   prof('frame'); preActivate(); dominoAssist(); updateFields(dt); prof('pre');
-  if (dt > 0) P.step(clamp(dt, 1 / 400, 1 / 40), onHit);
+  if (dt > 0) {
+    physAcc += dt; let n = 0;
+    while (physAcc >= STEP - 1e-7 && n < MAX_STEPS) { P.step(STEP, onHit); physAcc -= STEP; n++; }
+    if (physAcc > STEP) physAcc = STEP * .999;   // overloaded: let the simulation fall behind rather than spiral
+    physAlpha = physAcc / STEP;
+    if (!n) for (const pb of P.awake()) if (pb.userData) pb.userData.mdirty = true;   // no step this frame: still re-blend
+  }
   simTime += dt; prof('physics');
   processFractures(); updateFire(); prof('fx-logic');
   // events

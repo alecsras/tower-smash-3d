@@ -20,7 +20,7 @@ async function openDriven(page) {
 }
 
 export function physicsCases() {
-  for (const [id, ms] of [['castle', 16.7], ['temple', 16.7], ['castle', 8.33]]) {
+  for (const [id, ms] of [['castle', 16.7], ['temple', 16.7], ['castle', 8.33], ['metropolis', 33.3]]) {
     test(`${id} at ${Math.round(1000 / ms)} fps: blocks never sink into the floor or launch`, async ({ page }) => {
       test.setTimeout(120_000);
       const errors = await openDriven(page);

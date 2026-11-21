@@ -32,7 +32,7 @@ export function makePhysics(RAPIER) {
   const queue = new RAPIER.EventQueue(true);
   const rbMap = new Map(), colMap = new Map();
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));
-  let activeCount = 0;
+  let activeCount = 0, stepNo = 0;
 
   class PBody {
     // opts: {shape:{kind:'box'|'ball'|'cyl'|'cone'|'hull', ...}, mass?, density?, pos, quat, fric, rest, ccd, ld, ad, events}
@@ -40,7 +40,8 @@ export function makePhysics(RAPIER) {
       Object.assign(this, { fric: .55, rest: .05, ld: .01, ad: .05, ccd: false, events: true }, o);
       this.position = o.pos || new V3(); this.quaternion = o.quat || new Q4();
       this.velocity = new V3(); this.angularVelocity = new V3();
-      this.rb = null; this.userData = null; this._sleep = true; 
+      this.rb = null; this.userData = null; this._sleep = true;
+      this.prevP = new V3(); this.prevQ = new Q4(); this._step = -1;   // pose one fixed step ago, for smoothed drawing
       const s = this.shape;
       this.boundingRadius = s.kind === 'box' ? Math.hypot(s.hx, s.hy, s.hz) : s.kind === 'ball' ? s.r : s.kind === 'hull' ? s.radius : Math.hypot(s.r, s.hh);
       if (this.mass == null) this.mass = this.density * this.volume();
@@ -83,7 +84,8 @@ export function makePhysics(RAPIER) {
       this.pull(); rbMap.delete(this.rb.handle); colMap.delete(this.colHandle);
       world.removeRigidBody(this.rb); this.rb = null; this._sleep = true;
     }
-    pull() { // copy state out of the simulation
+    pull(stepped) { // copy state out of the simulation (stepped: remember the previous pose for smoothing)
+      if (stepped) { this.prevP.copy(this.position); this.prevQ.copy(this.quaternion); this._step = stepNo; }
       const rb = this.rb, t = rb.translation(), r = rb.rotation(), v = rb.linvel(), w = rb.angvel();
       this.position.set(t.x, t.y, t.z); this.quaternion.set(r.x, r.y, r.z, r.w); this.velocity.set(v.x, v.y, v.z); this.angularVelocity.set(w.x, w.y, w.z);
     }
@@ -114,6 +116,7 @@ export function makePhysics(RAPIER) {
 
   // advance the simulation; onHit(a, b, impactSpeed) fires for new contacts using pre-step velocities
   function step(dt, onHit) {
+    stepNo++;
     world.timestep = dt;
     world.step(queue);
     queue.drainCollisionEvents((h1, h2, started) => {
@@ -127,8 +130,19 @@ export function makePhysics(RAPIER) {
     for (const pb of rbMap.values()) pb._sleep = true;
     activeCount = 0;
     world.forEachActiveRigidBody(rb => {
-      const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true;
+      const pb = rbMap.get(rb.handle); if (!pb) return; pb.pull(true); pb._sleep = false; activeCount++; if (pb.userData) pb.userData.mdirty = true;
     });
   }
-  return { world, ground, PBody, step, get activeCount() { return activeCount; }, bodies: () => rbMap.values(), setIterations(n) { world.numSolverIterations = n; } };
+  // the pose to draw: blended between the last two fixed steps (alpha 0 = previous step, 1 = latest)
+  function renderPose(pb, alpha, outP, outQ) {
+    const p = pb.position, q = pb.quaternion;
+    if (pb._step !== stepNo || alpha >= 1) { outP.set(p.x, p.y, p.z); outQ.set(q.x, q.y, q.z, q.w); return; }
+    const a = pb.prevP, b = pb.prevQ, k = 1 - alpha;
+    outP.set(a.x * k + p.x * alpha, a.y * k + p.y * alpha, a.z * k + p.z * alpha);
+    const d = b.x * q.x + b.y * q.y + b.z * q.z + b.w * q.w, sg = d < 0 ? -alpha : alpha;   // nlerp along the short way
+    const x = b.x * k + q.x * sg, y = b.y * k + q.y * sg, z = b.z * k + q.z * sg, w = b.w * k + q.w * sg, l = Math.hypot(x, y, z, w) || 1;
+    outQ.set(x / l, y / l, z / l, w / l);
+  }
+  function* awake() { for (const pb of rbMap.values()) if (!pb._sleep) yield pb; }
+  return { world, ground, PBody, step, renderPose, awake, get stepNo() { return stepNo; }, get activeCount() { return activeCount; }, bodies: () => rbMap.values(), setIterations(n) { world.numSolverIterations = n; } };
 }

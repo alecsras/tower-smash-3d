@@ -146,7 +146,7 @@ class Batch {
 const WHITE3 = [1, 1, 1];
 function writeMatrix(o) {
   const b = o.body, k = o.pop ? Math.max(.01, 1 - o.pop * o.pop) : 1;
-  _p.set(b.position.x, b.position.y, b.position.z); _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  P.renderPose(b, physAlpha, _p, _q);
   _s.set(o.sc[0] * k, o.sc[1] * k, o.sc[2] * k);
   o.batch.mesh.setMatrixAt(o.bi, _m4.compose(_p, _q, _s)); o.mdirty = !!o.pop;
 }

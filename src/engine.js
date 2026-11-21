@@ -23,6 +23,24 @@ export function createEngine(RAPIER) {
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(600, .5, 600).setTranslation(0, -.5, 0).setFriction(.6));
   const anchor = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());   // the ground end of anchor bonds
   const bodies = new Map(), byRb = new Map(), byCol = new Map(), vel = new Map();
+  // ---- settling (F3): still rubble freezes into fixed scenery ----
+  // One jittering block keeps a whole touching pile awake, because Rapier sleeps only whole islands. A block that has
+  // been still for a second, touching only the ground, frozen blocks or other still blocks, becomes a FIXED body: it
+  // still holds up what rests on it, costs nothing, and no longer joins the pile into one island, so the rest can sleep.
+  // It turns back into a normal body when hit, pushed or blasted, when something it rests on moves or disappears, or
+  // when an earthquake starts. Nothing ever leaves the simulation and nothing is forced to sleep.
+  const STILL_V2 = .08 * .08, STILL_W2 = .2 * .2, STILL_T = .8, HIT_V = .6, MOVED_V2 = .3 * .3, CHECK = 20;
+  const still = new Map(), frozen = new Set(), dependents = new Map();   // dependents: id -> frozen ids resting on it
+  let stepCount = 0;
+  function unfreeze(id) {
+    const stack = [id];
+    while (stack.length) {
+      const k = stack.pop();
+      if (frozen.delete(k)) { const rb = bodies.get(k); if (rb) rb.setBodyType(RAPIER.RigidBodyType.Dynamic, true); still.set(k, 0); }
+      const deps = dependents.get(k);
+      if (deps) { dependents.delete(k); for (const d of deps) if (frozen.has(d)) stack.push(d); }
+    }
+  }
   const joints = new Map(), jointsOf = new Map();
   let quake = null, active = 0;
 
@@ -54,23 +72,26 @@ export function createEngine(RAPIER) {
       if (d.lockRot) b.lockRotations();
       const rb = world.createRigidBody(b), col = world.createCollider(collider(d), rb);
       bodies.set(id, rb); byRb.set(rb.handle, id); byCol.set(col.handle, id); vel.set(id, [d.v[0], d.v[1], d.v[2]]);
+      if (d.creep !== false) still.set(id, 0);
     },
     rm(id) {
       const rb = bodies.get(id); if (!rb) return;
       const s = jointsOf.get(id); if (s) { for (const jid of [...s]) dropJoint(jid); jointsOf.delete(id); }
       byRb.delete(rb.handle); for (let i = 0; i < rb.numColliders(); i++) byCol.delete(rb.collider(i).handle);
-      world.removeRigidBody(rb); bodies.delete(id); vel.delete(id);
+      unfreeze(id);   // whatever rested on it must be free to fall
+      world.removeRigidBody(rb); bodies.delete(id); vel.delete(id); still.delete(id);
     },
-    wake(id) { const rb = bodies.get(id); if (rb) rb.wakeUp(); },
+    wake(id) { const rb = bodies.get(id); if (rb) { unfreeze(id); rb.wakeUp(); } },
     sleep(id) { const rb = bodies.get(id); if (rb) rb.sleep(); },
-    lv(id, x, y, z) { const rb = bodies.get(id); if (rb) rb.setLinvel({ x, y, z }, true); },
-    av(id, x, y, z) { const rb = bodies.get(id); if (rb) rb.setAngvel({ x, y, z }, true); },
-    imp(id, x, y, z) { const rb = bodies.get(id); if (rb) rb.applyImpulse({ x, y, z }, true); },
-    impAt(id, x, y, z, px, py, pz) { const rb = bodies.get(id); if (rb) rb.applyImpulseAtPoint({ x, y, z }, { x: px, y: py, z: pz }, true); },
+    lv(id, x, y, z) { const rb = bodies.get(id); if (rb) { unfreeze(id); rb.setLinvel({ x, y, z }, true); } },
+    av(id, x, y, z) { const rb = bodies.get(id); if (rb) { unfreeze(id); rb.setAngvel({ x, y, z }, true); } },
+    imp(id, x, y, z) { const rb = bodies.get(id); if (rb) { unfreeze(id); rb.applyImpulse({ x, y, z }, true); } },
+    impAt(id, x, y, z, px, py, pz) { const rb = bodies.get(id); if (rb) { unfreeze(id); rb.applyImpulseAtPoint({ x, y, z }, { x: px, y: py, z: pz }, true); } },
     iters(n) { world.numSolverIterations = n; },
     joint(jid, a, b, la, fa, lb, fb) {
       const ra = bodies.get(a), rbB = b < 0 ? anchor : bodies.get(b);
       if (!ra || !rbB || joints.has(jid)) return;
+      unfreeze(a); if (b >= 0) unfreeze(b);
       const v = p => ({ x: p[0], y: p[1], z: p[2] }), r = q => ({ x: q[0], y: q[1], z: q[2], w: q[3] });
       const joint = world.createImpulseJoint(RAPIER.JointData.fixed(v(la), r(fa), v(lb), r(fb)), ra, rbB, false);
       const ids = b < 0 ? [a] : [a, b]; joints.set(jid, { joint, ids });
@@ -79,6 +100,7 @@ export function createEngine(RAPIER) {
     unjoint(jid) { dropJoint(jid); },
     quake(what, x, y, z) {
       if (what === 'start' && !quake) {
+        for (const id of [...frozen]) unfreeze(id);
         const kin = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0, 0));
         world.createCollider(RAPIER.ColliderDesc.cuboid(300, .5, 300).setTranslation(0, -.5, 0).setFriction(.95), kin);
         ground.setEnabled(false); quake = kin;
@@ -87,6 +109,28 @@ export function createEngine(RAPIER) {
     }
   };
 
+  function freezeStill() {
+    const ok = [];
+    for (const [id, t] of still) {
+      if (t < STILL_T || frozen.has(id) || jointsOf.has(id)) continue;
+      const rb = bodies.get(id); if (!rb || rb.isSleeping()) continue;
+      let calmNbrs = true; const below = [], y = rb.translation().y;
+      world.contactPairsWith(rb.collider(0), c => {
+        if (!calmNbrs) return;
+        const n = byCol.get(c.handle);
+        if (n === undefined) return;                      // the ground
+        const nb = bodies.get(n);
+        if (!frozen.has(n) && !(nb && nb.isSleeping()) && !(still.get(n) >= STILL_T)) { calmNbrs = false; return; }
+        if (nb && nb.translation().y < y - .05) below.push(n);
+      });
+      if (calmNbrs) ok.push([id, rb, below]);
+    }
+    for (const [id, rb, below] of ok) {
+      rb.setBodyType(RAPIER.RigidBodyType.Fixed, false); frozen.add(id);
+      const c = vel.get(id); c[0] = c[1] = c[2] = 0;
+      for (const n of below) { let s = dependents.get(n); if (!s) dependents.set(n, s = new Set()); s.add(id); }
+    }
+  }
   function stepOnce(dt, hits) {
     world.timestep = dt;
     world.step(queue);
@@ -95,13 +139,21 @@ export function createEngine(RAPIER) {
       if (!started) return;
       const a = byCol.has(h1) ? byCol.get(h1) : -1, b = byCol.has(h2) ? byCol.get(h2) : -1;
       const va = a >= 0 ? vel.get(a) : null, vb = b >= 0 ? vel.get(b) : null;
-      hits.push(a, b, Math.hypot((va ? va[0] : 0) - (vb ? vb[0] : 0), (va ? va[1] : 0) - (vb ? vb[1] : 0), (va ? va[2] : 0) - (vb ? vb[2] : 0)));
+      const sp = Math.hypot((va ? va[0] : 0) - (vb ? vb[0] : 0), (va ? va[1] : 0) - (vb ? vb[1] : 0), (va ? va[2] : 0) - (vb ? vb[2] : 0));
+      if (sp > HIT_V) { if (frozen.has(a)) unfreeze(a); if (frozen.has(b)) unfreeze(b); }
+      hits.push(a, b, sp);
     });
     active = 0;
     world.forEachActiveRigidBody(rb => {
       const id = byRb.get(rb.handle); if (id === undefined) return;
       const v = rb.linvel(), c = vel.get(id); c[0] = v.x; c[1] = v.y; c[2] = v.z; active++;
+      const v2 = v.x * v.x + v.y * v.y + v.z * v.z;
+      if (v2 > MOVED_V2 && dependents.has(id)) unfreeze(id);   // it moved: free whatever froze on top of it
+      if (!still.has(id)) return;
+      const w = rb.angvel();
+      still.set(id, v2 < STILL_V2 && w.x * w.x + w.y * w.y + w.z * w.z < STILL_W2 ? still.get(id) + dt : 0);
     });
+    if (++stepCount % CHECK === 0 && !quake) freezeStill();
   }
 
   function run(cmds) {

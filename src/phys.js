@@ -37,7 +37,7 @@ export async function makePhysics({ src, worker: wantWorker }) {
 
   let cmds = [], nextId = 1, nextJoint = 1, activeCount = 0, stepNo = 0, stepsTotal = 0, iters = 4;
   let inFlight = false, owed = 0, pending = null, seq = 0;
-  const byId = new Map();
+  const byId = new Map(), cmdStats = {};   // cmdStats: commands sent, by kind (diagnostics)
   if (wk) wk.onmessage = e => {
     const m = e.data;
     if (m.t === 'res') { pending = m; inFlight = false; }
@@ -70,7 +70,7 @@ export async function makePhysics({ src, worker: wantWorker }) {
       const s = this.shape, p = this.position, q = this.quaternion, v = this.velocity, w = this.angularVelocity;
       this.id = nextId++; this.inWorld = true; this._sleep = !!sleeping; byId.set(this.id, this);
       cmds.push(['add', this.id, { kind: s.kind, hx: s.hx, hy: s.hy, hz: s.hz, r: s.r, hh: s.hh, points: s.points, mass: this.mass, fric: this.fric, rest: this.rest,
-        ld: this.ld, ad: this.ad, ccd: this.ccd, gs: this.gs, lockRot: this.lockRot, events: this.events, sleeping: !!sleeping,
+        ld: this.ld, ad: this.ad, ccd: this.ccd, gs: this.gs, lockRot: this.lockRot, events: this.events, sleeping: !!sleeping, creep: this.creep,
         p: [p.x, p.y, p.z], q: [q.x, q.y, q.z, q.w], v: [v.x, v.y, v.z], w: [w.x, w.y, w.z] }]);
     }
     detach() {
@@ -123,7 +123,7 @@ export async function makePhysics({ src, worker: wantWorker }) {
   // off and their result is taken in on a later frame (the game draws the latest pose it has).
   function advance(n, dt, onHit) {
     if (!wk) {
-      for (let i = 0; i < n; i++) { cmds.push(['step', 1, dt]); const r = engine.run(cmds); cmds = []; apply(r, onHit); }
+      for (let i = 0; i < n; i++) { for (const c of cmds) cmdStats[c[0]] = (cmdStats[c[0]] || 0) + 1; cmds.push(['step', 1, dt]); const r = engine.run(cmds); cmds = []; apply(r, onHit); }
       return n;
     }
     let got = 0;
@@ -147,7 +147,7 @@ export async function makePhysics({ src, worker: wantWorker }) {
 
   return {
     PBody, advance, step: (dt, onHit) => advance(1, dt, onHit), renderPose, awake,
-    mode: wk ? 'worker' : 'main',
+    mode: wk ? 'worker' : 'main', cmdStats,
     get stepNo() { return stepNo; }, get stepsTotal() { return stepsTotal; }, get activeCount() { return activeCount; }, get busy() { return inFlight; },
     bodies: () => byId.values(),
     setIterations(n) { if (n !== iters) { iters = n; cmds.push(['iters', n]); } },

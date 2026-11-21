@@ -6,7 +6,7 @@ const SAVE_VERSION = 2;
 const SAVE_DEFAULTS = () => ({
   v: SAVE_VERSION, coins: 250, coinFrac: 0, unlocked: {}, sandbox: false, camp: {}, daily: {},
   quality: matchMedia('(pointer:coarse)').matches ? 'low' : 'high', qmode: 'auto',
-  name: '', onboarded: false, trained: false, hints: {}, tips: {}, matTheme: 'original', physWorker: false, stats: {}, volume: .8, haptics: true, camArrows: false,
+  name: '', onboarded: false, trained: false, hints: {}, tips: {}, matTheme: 'original', physWorker: false, stats: {}, best: {}, volume: .8, haptics: true, camArrows: false,
   calm: matchMedia('(prefers-reduced-motion: reduce)').matches, follow: false, myPrefabs: []
 });
 function migrateSave(s) {

@@ -155,3 +155,4 @@ body.replaying #top,body.replaying #tray,body.replaying #hud,body.replaying #siz
 .airow{display:flex;gap:8px}.airow input{flex:1;min-width:0;border:2px solid #d9cdf5;border-radius:12px;padding:10px;font:700 15px inherit;font-family:inherit}.airow .b1{margin:0;background:#7a3cff}
 .aiopts{align-items:center;justify-content:space-between;margin-top:8px}.aiopts .b2{margin:0;padding:8px 12px}
 .aist{font-size:12px;color:#5a3cb0;min-height:16px;margin:6px 2px}
+.pop.mult{color:#7de3ff;font-size:24px}

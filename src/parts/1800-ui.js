@@ -8,12 +8,13 @@ function updateHud() {
   for (const o of homes) {
     const h = o.home, p = o.body.position, q = o.body.quaternion;
     const dot = Math.abs(q.x * h.q.x + q.y * h.q.y + q.z * h.q.z + q.w * h.q.w);
-    if (o.gone || p.distanceTo(h.p) > .6 || 2 * Math.acos(Math.min(1, dot)) > (o.mat === 'domino' ? .22 : .45)) down++;
+    if (o.gone || p.distanceTo(h.p) > .6 || 2 * Math.acos(Math.min(1, dot)) > (o.mat === 'domino' ? .22 : .45)) { down++; if (!o.scored) { o.scored = true; scoreTopple(o); } }
   }
+  scoreSettle();
   const pct = Math.round(down / homes.length * 100);
   comboCheck(down);
   if (chal) { chal.pct = pct; hud.textContent = challengeHud(); return; }
-  hud.textContent = `💥 ${down}/${homes.length} toppled · ${pct}%` + (pct === 100 ? ' 🏆' : '');
+  hud.textContent = `💥 ${pct}% toppled` + scoreHud() + (pct === 100 ? ' 🏆' : '');
 }
 // toasts: one at a time, queued; kind 'warn' stays longer and is colored
 let toastT = null, toastQ = [];

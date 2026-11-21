@@ -259,7 +259,7 @@ function setNight(on) {
 // ---- combo popups ----
 const SMASH_WORDS = ['MEGA SMASH!', 'DEMOLITION!', 'KABOOM!', 'TOTAL CHAOS!', 'OBLITERATED!', 'WRECKED!'];
 function comboCheck(down) {
-  if (lastDown == null || down < lastDown) { lastDown = down; return; }
+  if (lastDown == null || down < lastDown) { lastDown = down; scoreReset(); return; }
   const d = down - lastDown; lastDown = down;
   if (d > 0 && !chal) { SAVE.coinFrac += d / 6; const c = Math.floor(SAVE.coinFrac); if (c) { SAVE.coinFrac -= c; addCoins(c, c >= 5); } }
   if (d < 3) return;
@@ -428,7 +428,8 @@ function finishChallenge() {
   const out = d.onResult ? d.onResult(res) || {} : {};
   $('rTitle').textContent = d.title;
   $('rStars').innerHTML = [0, 1, 2].map(k => `<span class="${k < stars ? 'on' : ''}" style="animation-delay:${k * .25}s">★</span>`).join('');
-  $('rPct').textContent = line;
+  scoreSettle();
+  $('rPct').textContent = line + (SCORE.pts ? ` · ${fmtPts(SCORE.pts)} points` + (SCORE.pts >= SCORE.best && SCORE.best ? ' (best)' : '') : '');
   $('rMsg').textContent = out.msg || (stars === 3 ? 'Perfect!' : win ? 'Nice — go for 3 stars?' : 'So close — try again!');
   $('rNext').style.display = out.next ? '' : 'none'; $('rNext').onclick = () => out.next && startChallenge(out.next);
   $('rRetry').onclick = () => startChallenge(d);
@@ -445,7 +446,8 @@ function exitChallenge() { if (!chal) return; chal = null; document.body.classLi
 function challengeHud() {
   const d = chal.def, shots = ammoLeft();
   if (d.goal === 'blorb') return `${d.short || ''} 🟢 ${chal.blorbs.filter(b => !b.popped).length} left · 🎯 ${shots}`;
-  return `${d.short || ''} 💥 ${chal.pct}% · 🎯 ${shots} · ★${d.stars.join(' ★')}`;
+  const next = d.stars.find(s => chal.pct < s);   // only the next star target, to leave room for the score
+  return `${d.short || ''} 💥 ${chal.pct}%${scoreHud()} · 🎯 ${shots}${next ? ` · ★${next}%` : ' · ★★★'}`;
 }
 
 // ---- demolition levels (the original 10) ----

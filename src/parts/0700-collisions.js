@@ -95,19 +95,21 @@ function explode(o, power = 1) {
   if (o.fire) { igniteNear(c, 5.5, 1); for (let i = 0; i < 60; i++) spawnP(c.x + rand(-2, 2), c.y + rand(0, 1), c.z + rand(-2, 2), rand(-3, 3), rand(2, 6), rand(-3, 3), rand(.6, 1.2), [1, rand(.3, .6), .05], rand(.4, .8), 1, 1, .9); }
 }
 function explodeAt(c, power = 1, style) {
-  const R = 5 * power, K = 26 * power;
+  // bigger, more physical blast: reach grows with power, the push falls off smoothly with distance (much harder near
+  // the centre), close blocks shatter, and the outer edge rattles and wakes things rather than hurling them
+  const R = 6.5 * power, K = 30 * power;
   bondBlast(c, R);
   for (const q of objs) {
     if (q.gone) continue;
     const qp = q.body.position, dist = Math.hypot(qp.x - c.x, qp.y - c.y, qp.z - c.z) || .01;
     if (dist > R) continue;
-    activate(q); const f = 1 - dist / R, imp = K * f * Math.sqrt(q.body.mass);
+    activate(q); const f = 1 - dist / R, imp = K * Math.pow(f, 1.4) * Math.sqrt(q.body.mass);
     q.body.applyImpulse(new V3((qp.x - c.x) / dist * imp, ((qp.y - c.y) / dist + .45) * imp, (qp.z - c.z) / dist * imp));
-    const w = q.body.angularVelocity; q.body.setAngularVelocity(w.x + rand(-6, 6) * f, w.y + rand(-6, 6) * f, w.z + rand(-6, 6) * f);
+    const w = q.body.angularVelocity, sp = 7 * f; q.body.setAngularVelocity(w.x + rand(-sp, sp), w.y + rand(-sp, sp), w.z + rand(-sp, sp));
     if (q.breakable && dist < R * .6) pendingBreak.add(q);
     if (q.tnt && dist < R * .7 && !q.chain) { q.chain = true; pendingBoom.push({ o: q, t: simTime + rand(.08, .2) }); }
-    if (dist < R * .4 && canFracture(q) && Math.random() < .8) pendingFracture.add(q);
-    if (dist < R * .75) ignite(q, power > 2 ? .9 : .35);
+    if (dist < R * .45 && canFracture(q) && Math.random() < .85) pendingFracture.add(q);
+    if (dist < R * .7) ignite(q, power > 2 ? .9 : .35);
     if (q.type === 'blorb' && dist < R * .8) q.hitHard = true;
   }
   recFx(c, power); explosionFX(c, power, style); followBoom(c);
@@ -118,17 +120,56 @@ const BOOM_STYLE = {
   spark: { flash: 0xffe0f0, ball: () => [rand(.6, 1), rand(.3, 1), rand(.3, 1)], ring: 0xffffff },
   toxic: { flash: 0x9aff6a, ball: () => [rand(.4, .7), 1, rand(.2, .4)], ring: 0xb0ff8a }
 };
+// a staged explosion: flash, white-hot fireball, billowing fire, a shockwave shell, a dust ring racing along the
+// ground, debris and embers, then a dark smoke column that lingers. Counts scale with the graphics level.
 function explosionFX(c, power, style = 'fire') {
-  const S = BOOM_STYLE[style] || BOOM_STYLE.fire;
+  const S = BOOM_STYLE[style] || BOOM_STYLE.fire, q = SAVE.quality === 'high' ? 1 : SAVE.quality === 'lite' ? .35 : .65, sp = Math.sqrt(power), N = n => Math.max(1, Math.round(n * q));
   flashMesh.position.copy(c); flashMesh.visible = true; flashT = 1; flashMesh.material.color.setHex(S.flash);
-  flash.color.setHex(S.flash); flash.position.copy(c); flash.intensity = 60 * power;
+  flash.color.setHex(S.flash); flash.position.copy(c); flash.intensity = 80 * power;
+  if (power >= 1.5 && !SAVE.calm) { const w = $('whiteout'); w.style.transition = 'none'; w.style.opacity = Math.min(.45, .12 * power); requestAnimationFrame(() => { w.style.transition = 'opacity .5s'; w.style.opacity = 0; }); }
   ringFX(c, power, S.ring); scorch(c, power);
-  for (let i = 0; i < 70; i++) { const a = rand(0, 6.28), e = rand(-.3, 1.3), s = rand(3, 11) * power;
-    spawnP(c.x, c.y, c.z, Math.cos(a) * Math.cos(e) * s, Math.sin(e) * s + 2, Math.sin(a) * Math.cos(e) * s, rand(.35, .8), S.ball(), rand(.35, .7), -3, 1.5); }
-  for (let i = 0; i < 14 + 8 * power; i++) { const a = rand(0, 6.28), s = rand(.5, 3.5) * Math.sqrt(power); spawnSmoke(c.x + rand(-.6, .6) * power, c.y + rand(0, .8), c.z + rand(-.6, .6) * power, Math.cos(a) * s, rand(1, 3.5), Math.sin(a) * s, rand(2.5, 4.5) * Math.sqrt(power), rand(1.6, 2.8) * Math.sqrt(power), [.3, .29, .28].map(x => x + rand(0, .12)), .75); }
-  for (let i = 0; i < 6; i++) spawnSmoke(c.x, c.y + .3, c.z, rand(-1, 1), rand(2, 4), rand(-1, 1), rand(.5, .9), rand(1.5, 2.2) * Math.sqrt(power), [1, .55, .2], .8);
-  for (let i = 0; i < 26; i++) spawnP(c.x, c.y, c.z, rand(-9, 9), rand(3, 13), rand(-9, 9), rand(.8, 1.6), [.25, .18, .1], .14, -20, 0);
-  shake = .55 * power; boomLayered(power, c); haptic(Math.min(90, 25 + power * 30));
+  fireball(c, power, S, style);
+  // billowing fire, then the fast spray of burning fragments
+  for (let i = 0; i < N(10 + 10 * power); i++) { const a = rand(0, 6.28), e = rand(0, 1.2), v = rand(1, 3.5) * sp;
+    spawnSmoke(c.x + rand(-.4, .4) * sp, c.y + rand(0, .6), c.z + rand(-.4, .4) * sp, Math.cos(a) * Math.cos(e) * v, rand(1.5, 4) + Math.sin(e) * v, Math.sin(a) * Math.cos(e) * v, rand(.5, 1), rand(1.4, 2.4) * sp, S.ball(), .85); }
+  for (let i = 0; i < N(70 + 20 * power); i++) { const a = rand(0, 6.28), e = rand(-.3, 1.3), v = rand(3, 12) * power;
+    spawnP(c.x, c.y, c.z, Math.cos(a) * Math.cos(e) * v, Math.sin(e) * v + 2, Math.sin(a) * Math.cos(e) * v, rand(.35, .8), S.ball(), rand(.35, .7), -3, 1.5); }
+  // a dark smoke column that rises, spreads and hangs around
+  for (let i = 0; i < N(16 + 16 * power); i++) { const a = rand(0, 6.28), h = rand(0, 1), r = rand(0, 1.2) * sp * (1 - h * .4);
+    const dark = rand(.1, .2);
+    spawnSmoke(c.x + Math.cos(a) * r, c.y + (.3 + h * 4) * sp, c.z + Math.sin(a) * r, Math.cos(a) * rand(.3, 1.2), rand(1, 2.6) * sp, Math.sin(a) * rand(.3, 1.2), rand(3.5, 7), rand(2.4, 4.2) * sp, [dark, dark * .95, dark * .9], .8); }
+  // a dust ring racing out along the ground
+  if (c.y < 2.5) for (let i = 0; i < N(18 + 8 * power); i++) { const a = i / (18 + 8 * power) * 6.28 + rand(-.1, .1), v = rand(6, 12) * sp;
+    spawnSmoke(c.x + Math.cos(a) * .8, .25, c.z + Math.sin(a) * .8, Math.cos(a) * v, rand(.2, .8), Math.sin(a) * v, rand(1, 1.8), rand(1, 1.8) * sp, [.62, .56, .46], .6); }
+  // dirt clods, then embers that drift down for a while
+  for (let i = 0; i < N(26 + 14 * power); i++) spawnP(c.x, c.y, c.z, rand(-9, 9) * sp, rand(3, 14) * sp, rand(-9, 9) * sp, rand(.8, 1.6), [.25, .18, .1], rand(.12, .2), -20, 0);
+  for (let i = 0; i < N(14 + 8 * power); i++) spawnP(c.x + rand(-1, 1), c.y + rand(0, 2), c.z + rand(-1, 1), rand(-3, 3) * sp, rand(2, 7) * sp, rand(-3, 3) * sp, rand(1.8, 3.2), [1, rand(.45, .7), .15], rand(.08, .14), -2.5, 0);
+  shake = Math.max(shake, Math.min(1.2, .55 * power)); boomLayered(power, c); haptic(Math.min(90, 25 + power * 30));
+  if (power >= 1.2) setTimeout(() => snd.rumble(), 280);
   try { navigator.vibrate && navigator.vibrate(70); } catch (e) {}
+}
+// the fireball: a white-hot core inside an orange shell that swells fast and fades, plus a faint shockwave shell
+const fbPool = [], _smokeCol = new THREE.Color(0x3a2a20);
+function fireball(c, power, S, style) {
+  let f = fbPool.find(x => !x.live);
+  if (!f) {
+    if (fbPool.length >= 8) return;
+    const mk = (col, op) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending })); m.visible = false; scene.add(m); return m; };
+    f = { core: mk(0xfff2c0, 1), shell: mk(0xff6a10, .95), wave: mk(0xffffff, .22) };
+    f.shell.material.blending = THREE.NormalBlending; f.wave.material.blending = THREE.NormalBlending; f.shell.renderOrder = 1; f.core.renderOrder = 2; fbPool.push(f);
+  }
+  f.live = true; const t0 = simTime, sp = Math.sqrt(power), R = 6.5 * power;
+  for (const m of [f.core, f.shell, f.wave]) { m.position.copy(c); m.visible = true; }
+  f.shell.material.color.setHex(style === 'plasma' ? 0x5aa8ff : style === 'toxic' ? 0x6fe04a : style === 'spark' ? 0xff7ad0 : 0xff6a10);
+  AFX.push({ upd() {
+    const k = (simTime - t0) / .55;   // 0..1 over ~0.55 s of game time
+    if (k >= 1) { this.kill(); return false; }
+    const e = 1 - Math.pow(1 - k, 3);
+    f.core.scale.setScalar(.4 + 1.2 * sp * e); f.core.material.opacity = Math.max(0, 1 - k * 2);
+    f.shell.scale.setScalar(.6 + 2.8 * sp * e); f.shell.material.opacity = .95 * Math.pow(1 - k, 1.5);
+    f.shell.material.color.lerp(_smokeCol, .06);   // cools from orange towards smoke as it grows
+    f.shell.position.y = c.y + e * .8 * sp;
+    const kw = Math.min(1, k * 2.4); f.wave.scale.setScalar(.5 + R * kw); f.wave.material.opacity = .22 * (1 - kw);
+  }, kill() { f.live = false; f.core.visible = f.shell.visible = f.wave.visible = false; } });
 }
 

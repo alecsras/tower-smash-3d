@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 — Ten big builds
+
+- Ten new mega builds of 2,000–3,000 blocks: Royal Castle, City Skyline, Sun Pyramid, Grand Colosseum, Labyrinth, Cathedral, Mega Dam, Domino Carpet (2,200 dominoes that fall row by row), Stone Forest and Office Grid. All tested to stand on their own with every block awake.
+
 ## 0.12.0 — Phase 2, Milestone 3: campaign, unlocks, engineer challenges
 
 - Campaign worlds: the 50 Blorb levels are now five worlds (Timber Town, Stone Valley, Concrete City, Marble Heights, Golden Citadel) that open at 0, 12, 30, 50 and 75 stars. Worlds you've already played stay open.

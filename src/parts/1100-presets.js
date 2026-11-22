@@ -376,6 +376,128 @@ const MEGA2 = [
   } }
 ];
 MEGA.push(...MEGA2);
+
+// ---- 2,000–3,000-block builds: one cube per grid cell, flush layers, nothing resting on air ----
+const cell = (m, i, L, k) => put(CUBE(m), i * G, L * LAY, k * G);
+const ring = (n, i, k) => i === 0 || k === 0 || i === n - 1 || k === n - 1;      // edge of an n x n square
+function seededRand(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const MEGA3 = [
+  { id: 'royal', mega: true, arena: 19, name: 'Royal Castle', emoji: '🏰', desc: 'Curtain walls, a gatehouse, four corner towers and a central keep', cam: [62, 3, .5], build() {
+    const used = new Set(), key = (i, k) => i + ',' + k;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {            // 6x6 corner towers, 10 high
+      const ci = sx * 15, ck = sz * 15;   // cells land on the same half-cell grid as the walls
+      for (let L = 0; L < 10; L++) for (let a = 0; a < 6; a++) for (let b = 0; b < 6; b++) { if (!ring(6, a, b)) continue; cell(L === 6 ? 'glass' : 'stone', ci + a - 2.5, L, ck + b - 2.5); }
+      for (let a = 0; a < 6; a++) for (let b = 0; b < 6; b++) used.add(key(ci + a - 2.5, ck + b - 2.5));
+    }
+    for (let i = -14.5; i <= 14.5; i++) for (let k = -14.5; k <= 14.5; k++) {   // walls 2 thick, 6 high, crenels on the outside
+      const d = Math.max(Math.abs(i), Math.abs(k)); if (d < 13.5 || used.has(key(i, k))) continue;
+      const gateRow = k < 0 && Math.abs(k) >= 13.5;
+      for (let L = 0; L < 6; L++) {
+        if (gateRow && ((Math.abs(i) <= 2.5 && L < 4) || (Math.abs(i) <= 3.5 && L === 4))) continue;   // gate + lintel course
+        cell(L === 0 ? 'concrete' : 'stone', i, L, k);
+      }
+      if (d === 14.5 && Math.round(Math.abs(i === 14.5 || i === -14.5 ? k : i)) % 2 === 0) cell('stone', i, 6, k);
+    }
+    put(Bx('stone', 8 * G - .005, 1, 2 * G - .005), 0, 4 * LAY, -14 * G);    // gate lintel resting on the wall either side
+    for (let L = 0; L < 14; L++) for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) { if (!ring(8, a, b)) continue; cell(L % 4 === 3 && !(a % 7 === 0 && b % 7 === 0) ? 'glass' : 'marble', a - 3.5, L, b - 3.5); }
+    for (const [a, b] of [[0, 0], [7, 0], [0, 7], [7, 7]]) cell('gold', a - 3.5, 14, b - 3.5);
+  } },
+  { id: 'skyline', mega: true, arena: 16, name: 'City Skyline', emoji: '🌆', desc: 'Nine office towers, from 8 to 24 floors', cam: [60, 8, .4], build() {
+    const H = [12, 18, 24, 14, 20, 16, 18, 8, 18], M = ['glass', 'concrete', 'glass', 'brick', 'glass', 'concrete', 'glass', 'brick', 'concrete'];
+    let t = 0;
+    for (const gx of [-9.5, 0, 9.5]) for (const gz of [-9.5, 0, 9.5]) {
+      const h = H.at(t), m = M.at(t); t++;
+      for (let L = 0; L < h; L++) for (let a = 0; a < 6; a++) for (let b = 0; b < 6; b++) {
+        if (!ring(6, a, b)) continue;
+        const corner = (a === 0 || a === 5) && (b === 0 || b === 5);
+        cell(corner || L % 4 === 3 ? 'steel' : m, gx + a - 2.5, L, gz + b - 2.5);
+      }
+    }
+  } },
+  { id: 'sunpyramid', mega: true, arena: 14, name: 'Sun Pyramid', emoji: '🔺', desc: 'Eleven solid steps with a temple and gold on top', cam: [52, 5, .4], build() {
+    let L = 0;
+    for (let n = 23; n >= 3; n -= 2, L++) for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
+      const edge = ring(n, a, b), front = b === 0 && Math.abs(a - (n - 1) / 2) <= 1;
+      cell(front ? 'stone' : edge ? 'sand' : 'sand', a - (n - 1) / 2, L, b - (n - 1) / 2);
+    }
+    for (let h = 0; h < 3; h++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) if (ring(3, a, b)) cell(h === 2 ? 'gold' : 'marble', a - 1, L + h, b - 1);
+    cell('tnt', 0, L, 0);
+  } },
+  { id: 'grandcolosseum', mega: true, arena: 16, name: 'Grand Colosseum', emoji: '🏛️', desc: 'A round arena, three blocks thick, one side already crumbling', cam: [56, 3, .55], build() {
+    for (let i = -14; i <= 14; i++) for (let k = -14; k <= 14; k++) {
+      const d = Math.hypot(i, k); if (d < 11.6 || d > 14.5) continue;
+      const ang = Math.atan2(k, i), outer = d > 13.5, ruin = ang > .5 && ang < 1.5;
+      const h = ruin ? 12 - Math.round(9 * Math.sin((ang - .5) * Math.PI)) : 12;
+      const col = Math.round((ang + Math.PI) / (2 * Math.PI) * 48) % 2 === 0;
+      for (let L = 0; L < h; L++) cell(outer && !col && L % 4 !== 3 && L % 4 !== 0 ? 'obsidian' : L % 4 === 3 ? 'stone' : 'marble', i, L, k);
+    }
+  } },
+  { id: 'labyrinth', mega: true, arena: 17, name: 'Labyrinth', emoji: '🌀', desc: 'A 31 x 31 maze, four blocks high, with a gold tower at its heart', cam: [50, 1, .95], build() {
+    const N = 15, W = 2 * N + 1, wall = Array.from({ length: W }, () => new Array(W).fill(true)), rnd = seededRand(7);
+    const st = [[0, 0]]; wall[1][1] = false; const seen = new Set(['0,0']);
+    while (st.length) {
+      const [x, y] = st.at(-1), nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [x + dx, y + dy]).filter(([a, b]) => a >= 0 && b >= 0 && a < N && b < N && !seen.has(a + ',' + b));
+      if (!nb.length) { st.pop(); continue; }
+      const [a, b] = nb.at(Math.floor(rnd() * nb.length)); seen.add(a + ',' + b);
+      wall[2 * a + 1][2 * b + 1] = false; wall[x + a + 1][y + b + 1] = false; st.push([a, b]);
+    }
+    wall[1][0] = false; wall[W - 2][W - 1] = false;   // way in, way out
+    for (let a = 0; a < W; a++) for (let b = 0; b < W; b++) {
+      const c = Math.abs(a - 15) <= 1 && Math.abs(b - 15) <= 1;
+      if (c) continue;
+      if (!wall[a][b]) continue;
+      const outer = a === 0 || b === 0 || a === W - 1 || b === W - 1;
+      for (let L = 0; L < (outer ? 5 : 4); L++) cell(outer ? 'stone' : L === 3 ? 'concrete' : 'brick', a - 15, L, b - 15);
+    }
+    for (let L = 0; L < 6; L++) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (a || b || L === 5) cell(L === 5 ? 'gold' : 'marble', a, L, b);
+  } },
+  { id: 'cathedral', mega: true, arena: 17, name: 'Cathedral', emoji: '⛪', desc: 'A long nave, rose windows and twin bell towers', cam: [58, 6, .35], build() {
+    const used = new Set(), key = (i, k) => i + ',' + k;
+    for (const sx of [-1, 1]) {                                       // bell towers, 5x5, 22 high
+      for (let L = 0; L < 22; L++) for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++) { if (!ring(5, a, b)) continue; cell(L > 17 && (a === 2 || b === 2) ? 'glass' : 'stone', sx * 8 + a - 2, L, -14 + b); }
+      for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++) used.add(key(sx * 8 + a - 2, -14 + b));
+      for (const [a, b] of [[0, 0], [4, 0], [0, 4], [4, 4]]) cell('gold', sx * 8 + a - 2, 22, -14 + b);   // finials on the tower corners
+    }
+    const put2 = (i, k, h, m) => { if (used.has(key(i, k))) return; used.add(key(i, k)); for (let L = 0; L < h; L++) cell(m(L), i, L, k); };
+    for (let k = -14; k <= 13; k++) for (const i of [-7, -6, 6, 7]) put2(i, k, 13, L => L % 4 === 2 && Math.abs(i) === 7 && k % 3 === 0 ? 'glass' : 'stone');   // nave walls
+    for (let i = -5; i <= 5; i++) for (const k of [-14, -13]) {        // front: a door 3 wide, a lintel, a rose window
+      if (used.has(key(i, k))) continue; used.add(key(i, k));
+      for (let L = 0; L < 16; L++) {
+        if ((Math.abs(i) <= 1 && L < 3) || (Math.abs(i) <= 2 && L === 3)) continue;
+        cell(Math.hypot(i, L - 10) < 2.6 ? 'glass' : 'stone', i, L, k);
+      }
+    }
+    put(Bx('stone', 5 * G - .005, 1, 2 * G - .005), 0, 3 * LAY, -13.5 * G);
+    for (let i = -5; i <= 5; i++) for (const k of [12, 13]) put2(i, k, 13, L => L % 4 === 2 && Math.abs(i) < 3 ? 'glass' : 'stone');   // apse
+  } },
+  { id: 'dam', mega: true, arena: 22, name: 'Mega Dam', emoji: '🌊', desc: 'A stepped concrete dam with three gate towers', cam: [62, 4, .35], build() {
+    for (let i = -20; i <= 20; i++) for (let L = 0; L < 14; L++) {
+      const thick = L < 5 ? 5 : L < 10 ? 4 : 3;
+      for (let k = 0; k < thick; k++) cell(L === 13 ? 'stone' : L % 5 === 4 && k === thick - 1 ? 'steel' : 'concrete', i, L, k - 2);
+    }
+    for (const gx of [-12, 0, 12]) for (let L = 14; L < 18; L++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) if (ring(3, a, b)) cell(L === 17 ? 'steel' : 'concrete', gx + a - 1, L, b - 2);
+  } },
+  { id: 'dominocarpet', mega: true, arena: 18, name: 'Domino Carpet', emoji: '🁢', desc: '2,200 dominoes that fall row by row. Tip the first row', cam: [44, 1, .9], build() {
+    for (let r = 0; r < 50; r++) for (let c = 0; c < 44; c++) put(Bx('domino', .18, 1.1, .55), (c - 21.5) * .7 + (r % 2 ? .35 : 0), 0, (r - 24.5) * .5, Math.PI / 2);
+  } },
+  { id: 'stoneforest', mega: true, arena: 17, name: 'Stone Forest', emoji: '🗿', desc: 'Thirty stone columns of every height, crowned with crystal', cam: [54, 4, .45], build() {
+    const rnd = seededRand(11);
+    for (let gi = -3; gi <= 3; gi++) for (let gk = -3; gk <= 3; gk++) {
+      if (Math.hypot(gi, gk) > 3.4 || rnd() < .18) continue;
+      const h = 4 + Math.floor(rnd() * 9), ci = gi * 4.6, ck = gk * 4.6;
+      for (let L = 0; L < h; L++) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) cell(L === h - 1 ? 'crystal' : L % 3 === 0 ? 'stone' : 'sand', Math.round(ci) + a, L, Math.round(ck) + b);
+    }
+  } },
+  { id: 'officegrid', mega: true, arena: 15, name: 'Office Grid', emoji: '🏢', desc: 'A nine-story lattice of rooms with a glass skin', cam: [50, 5, .4], build() {
+    const N = 25;
+    for (let L = 0; L < 9; L++) for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
+      if (a % 4 && b % 4) continue;
+      const skin = a === 0 || b === 0 || a === N - 1 || b === N - 1;
+      cell(skin ? (a % 4 === 0 && b % 4 === 0 ? 'steel' : 'glass') : 'concrete', a - 12, L, b - 12);
+    }
+  } }
+];
+MEGA.push(...MEGA3);
 PRESETS.unshift(...MEGA);
 
 // ---- material themes: load a preset (or repaint what's on the pad) in one material ----

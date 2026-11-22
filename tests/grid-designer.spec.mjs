@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { open } from './helpers.mjs';
+// the designer slides in; measure the grid only once it has stopped moving
+async function gridBox(page) {
+  let prev = null;
+  for (let k = 0; k < 40; k++) { const b = await page.locator('#gdCanvas').boundingBox(); if (b && prev && b.y === prev.y && b.width === prev.width && b.width > 50) return b; prev = b; await page.waitForTimeout(60); }
+  return prev;
+}
 
 // drag across grid cells with a real pointer
 async function drag(page, cells) {
-  const box = await page.locator('#gdCanvas').boundingBox(), w = await page.evaluate(() => window.__game.gd.w), cs = box.width / w;
+  const box = await gridBox(page), w = await page.evaluate(() => window.__game.gd.w), cs = box.width / w;
   const at = ([i, j]) => [box.x + i * cs + cs / 2, box.y + j * cs + cs / 2];
   await page.mouse.move(...at(cells[0])); await page.mouse.down();
   for (const c of cells.slice(1)) await page.mouse.move(...at(c), { steps: 5 });
@@ -48,7 +54,7 @@ test('grid designer: every drawing tool, mirror, undo/redo and resize', async ({
   expect((await cell(page, 3, 7)).m).toBe('wood'); expect(await cell(page, 5, 8)).toBe(null);
   // fill the hole inside the box
   await tool(page, 'Fill'); await page.locator('.gdsw[aria-label="Gold"]').click();
-  const box = await page.locator('#gdCanvas').boundingBox(), cs = box.width / 12;
+  const box = await gridBox(page), cs = box.width / 12;
   await page.mouse.click(box.x + 5.5 * cs, box.y + 8.5 * cs);
   expect((await cell(page, 5, 8)).m).toBe('gold'); expect((await cell(page, 4, 9)).m).toBe('gold');
   expect(await cell(page, 0, 11)).toBe(null);   // fill stayed inside the box

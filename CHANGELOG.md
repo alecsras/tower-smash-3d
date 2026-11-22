@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 — 50 new weapons, bigger explosions
+
+- 50 new weapons, 93 in all. Kinetic: Golf Barrage, Javelin, Saw Blade, Ball Bearings, Falling Safe, Boulder Avalanche, Cannon Volley, Steel Girder, Bowling Barrage, Giant Fist. Explosive: Mortar, MIRV, Landmines, Airstrike, Thermobaric, Firecrackers, Bouncing Bomb, Countdown Megabomb, Chain Bomb, Barrel Drop, Sonic Boom, Rocket Barrage. Elemental: Blizzard, Inferno, Hurricane, Quake Shell, Geyser, Sandstorm, Thermite, Thunderstorm, Ice Lance, Magma Flood. Exotic: White Hole, Time Bubble, Teleporter, Disintegrator, Gravity Well, Rod from God, Plasma Cannon, Repulsor Beam, Levitation Field, Quantum Scatter. Silly: Watermelon, Flying Cow, Jelly Cube, Confetti Cannon, Kitchen Sink, Snowball Volley, Beach Ball, Monster Tire.
+- Explosions are bigger and more realistic: 30% more reach, a much harder push near the centre, more shattering, and a staged look — flash, an orange fireball with a white-hot core that cools as it swells, a shockwave, a dust ring racing along the ground, dirt clods, embers and a dark smoke plume that rises and lingers. Big blasts get a white screen flash and a delayed rumble. Effects scale with the graphics setting.
+
 ## 0.12.1 — Ten big builds
 
 - Ten new mega builds of 2,000–3,000 blocks: Royal Castle, City Skyline, Sun Pyramid, Grand Colosseum, Labyrinth, Cathedral, Mega Dam, Domino Carpet (2,200 dominoes that fall row by row), Stone Forest and Office Grid. All tested to stand on their own with every block awake.

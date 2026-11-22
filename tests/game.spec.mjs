@@ -26,7 +26,7 @@ test('every weapon fires without errors', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = await open(page);
   const keys = await page.evaluate(() => { const g = window.__game; g.SAVE.sandbox = true; return Object.keys(g.PROJ).filter(k => !g.PROJ[k].hidden); });
-  expect(keys.length).toBeGreaterThanOrEqual(43);
+  expect(keys.length).toBeGreaterThanOrEqual(93);
   await page.evaluate(() => { const g = window.__game; g.loadPreset(g.PRESETS.find(p => p.id === 'temple')); g.setMode('throw'); });
   for (const k of keys) {
     await page.evaluate(kind => window.__game.throwAt(kind, 0, 2, 0, .7), k);

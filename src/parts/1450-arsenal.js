@@ -59,7 +59,7 @@ function beamFX(a, b, color, width = .12, life = .45) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(width, width, L, 8, 1, true), glowMat(color));
   m.position.copy(a).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(UPY, d.normalize()); scene.add(m);
   const core = new THREE.Mesh(new THREE.CylinderGeometry(width * .35, width * .35, L, 6, 1, true), glowMat(0xffffff)); m.add(core);
-  AFX.push({ t0: simTime, upd() { const k = (simTime - this.t0) / life; m.material.opacity = core.material.opacity = Math.max(0, 1 - k); if (k >= 1) { scene.remove(m); return false; } } });
+  AFX.push({ t0: simTime, upd() { const k = (simTime - this.t0) / life; m.material.opacity = core.material.opacity = Math.max(0, 1 - k); if (k >= 1) { dropMesh(m); return false; } } });
   return m;
 }
 function boltFX(top, bot, color = 0xbfe4ff) {

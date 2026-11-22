@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.1 — Weapon crash fixes
+
+- Fixed a crash (the "reload" screen) when using Golf Barrage, Javelin, Steel Girder, Falling Safe, Kitchen Sink, Flying Cow, Jelly Cube or Beach Ball: some sounds were played without a volume. Every sound now has a safe default and bad values are ignored instead of crashing.
+- Fixed memory growing with every shot: projectile and effect models are now freed when they're gone, and the Repulsor Beam draws one beam instead of one per frame. This could make phones reset the graphics and reload during long sessions.
+- New tests pick every one of the 93 weapons from the tray and fire it with a real press, on Chrome and on iPhone (Safari).
+
 ## 0.13.0 — 50 new weapons, bigger explosions
 
 - 50 new weapons, 93 in all. Kinetic: Golf Barrage, Javelin, Saw Blade, Ball Bearings, Falling Safe, Boulder Avalanche, Cannon Volley, Steel Girder, Bowling Barrage, Giant Fist. Explosive: Mortar, MIRV, Landmines, Airstrike, Thermobaric, Firecrackers, Bouncing Bomb, Countdown Megabomb, Chain Bomb, Barrel Drop, Sonic Boom, Rocket Barrage. Elemental: Blizzard, Inferno, Hurricane, Quake Shell, Geyser, Sandstorm, Thermite, Thunderstorm, Ice Lance, Magma Flood. Exotic: White Hole, Time Bubble, Teleporter, Disintegrator, Gravity Well, Rod from God, Plasma Cannon, Repulsor Beam, Levitation Field, Quantum Scatter. Silly: Watermelon, Flying Cow, Jelly Cube, Confetti Cannon, Kitchen Sink, Snowball Volley, Beach Ball, Monster Tire.

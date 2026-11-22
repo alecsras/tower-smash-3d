@@ -51,13 +51,13 @@ def('golf', { label: 'Golf Barrage', cat: 'kinetic', price: 70, emoji: '⛳', st
   fire({ o0, dir }) {
     const g = shared('golfG', () => new THREE.SphereGeometry(.12, 10, 8)), m = shared('golfM', () => stdMat(0xf4f4f0, { roughness: .3 }));
     for (let i = 0; i < 30; i++) later(i * .045, () => { const d = dir.clone().add(V(rand(-.04, .04), rand(-.02, .05), rand(-.04, .04))).normalize(), mesh = new THREE.Mesh(g, m); mesh.castShadow = true;
-      spawnBody('golfball', { kind: 'ball', r: .12 }, 2.5, o0, d.multiplyScalar(58), mesh, { expire: simTime + 5 }, { rest: .85, gs: .6 }); if (i % 4 === 0) snd.clack(); });
+      spawnBody('golfball', { kind: 'ball', r: .12 }, 2.5, o0, d.multiplyScalar(58), mesh, { expire: simTime + 5 }, { rest: .85, gs: .6 }); if (i % 4 === 0) snd.clack(.6); });
   } });
 def('javelin', { label: 'Javelin', cat: 'kinetic', price: 110, emoji: '🔱', style: 'beam', desc: 'A long steel spear that skewers deep into the tower',
   mesh: () => grp(cyl(.06, .06, 3, stdMat(0x8a6a44)), at(new THREE.Mesh(new THREE.ConeGeometry(.12, .45, 10), stdMat(0xc9d0d8, { metalness: .7, roughness: .25 })), 0, 1.7, 0)),
   fire({ o0, dir, pw }) {
     const mesh = ARSENAL.javelin.mesh(); mesh.children.forEach(c => c.rotation.x = Math.PI / 2); mesh.children[1].position.set(0, 0, 1.7);
-    const o = spawnBody('javelin', { kind: 'box', hx: .08, hy: .08, hz: 1.6 }, 60, o0, dir.clone().multiplyScalar(48 + 20 * pw), mesh, { expire: simTime + 7, onHit(j, other) { if (other && other.userData && other.userData.type === 'block') crackNear(bpos(j), 1.6, .8); snd.clang(); } }, { quat: quatTo(V(0, 0, 1), dir), gs: .35 });
+    const o = spawnBody('javelin', { kind: 'box', hx: .08, hy: .08, hz: 1.6 }, 60, o0, dir.clone().multiplyScalar(48 + 20 * pw), mesh, { expire: simTime + 7, onHit(j, other) { if (other && other.userData && other.userData.type === 'block') crackNear(bpos(j), 1.6, .8); snd.clang(1); } }, { quat: quatTo(V(0, 0, 1), dir), gs: .35 });
     o.body.setAngularVelocity(0, 0, 0); snd.whoosh();
   } });
 def('sawblade', { label: 'Saw Blade', cat: 'kinetic', price: 190, emoji: '🪚', style: 'beam', desc: 'A screaming circular saw slices a level cut through the build',
@@ -70,7 +70,7 @@ def('sawblade', { label: 'Saw Blade', cat: 'kinetic', price: 190, emoji: '🪚',
       if (Math.random() < .8) spawnP(p.x, p.y, p.z, rand(-4, 4), rand(0, 3), rand(-4, 4), .3, [1, .8, .4], .12, -8, 0); },
     { every: .05, tick() { for (const o of nearObjs(p, 2, isBlock)) { if (Math.abs(o.body.position.y - p.y) > .7) continue; cut++;
         if (canFracture(o)) pendingFracture.add(o); else vaporize(o, MAT_DUST[o.mat] || [.7, .7, .7], 3); push(o, dir.x * 3, .5, dir.z * 3); } if (cut) snd.crack(); },
-      end() { scene.remove(m); if (cut) toast(`🪚 Sliced ${cut}`); }, kill() { scene.remove(m); } });
+      end() { dropMesh(m); if (cut) toast(`🪚 Sliced ${cut}`); }, kill() { dropMesh(m); } });
     noise(3, 'bandpass', 2400, .2, 3);
   } });
 def('bearings', { label: 'Ball Bearings', cat: 'kinetic', price: 130, emoji: '🔩', style: 'strike', aoe: 3, desc: '150 steel bearings pour down and roll into every gap',
@@ -83,7 +83,7 @@ def('safe', { label: 'Falling Safe', cat: 'kinetic', price: 150, emoji: '🗄️
   mesh: () => grp(box(1.3, 1.5, 1.3, stdMat(0x3c4a3c, { metalness: .6, roughness: .4 })), at(cyl(.22, .22, .08, stdMat(0xc8b060, { metalness: .8 })), 0, .2, .68)),
   fire({ target }) {
     const m = ARSENAL.safe.mesh(); m.children[1].rotation.x = Math.PI / 2;
-    spawnBody('safe', { kind: 'box', hx: .65, hy: .75, hz: .65 }, 1000, V(target.x, target.y + 34, target.z), V(0, -14, 0), m, { expire: simTime + 9, onHit() { snd.clang(); shake = .7; } }, { rest: .02 });
+    spawnBody('safe', { kind: 'box', hx: .65, hy: .75, hz: .65 }, 1000, V(target.x, target.y + 34, target.z), V(0, -14, 0), m, { expire: simTime + 9, onHit() { snd.clang(1); shake = .7; } }, { rest: .02 });
     snd.whoosh();
   } });
 def('avalanche', { label: 'Boulder Avalanche', cat: 'kinetic', price: 280, emoji: '🏔️', style: 'strike', aoe: 6, desc: 'A dozen boulders thunder in along the ground',
@@ -108,7 +108,7 @@ def('girder', { label: 'Steel Girder', cat: 'kinetic', price: 200, emoji: '🏗�
   mesh: () => { const mt = stdMat(0xc0522a, { metalness: .5, roughness: .5 }); return grp(box(5, .08, .5, mt), at(box(5, .08, .5, mt), 0, .44, 0), at(box(5, .44, .08, mt), 0, .22, 0)); },
   fire({ o0, dir, pw }) {
     const m = ARSENAL.girder.mesh(); m.children.forEach(c => c.position.y -= .22);
-    const o = spawnBody('girder', { kind: 'box', hx: 2.5, hy: .25, hz: .25 }, 400, o0, dir.clone().multiplyScalar(26 + 18 * pw), m, { expire: simTime + 8, onHit() { snd.clang(); } }, { quat: quatTo(V(1, 0, 0), flatDir(dir)), gs: .7 });
+    const o = spawnBody('girder', { kind: 'box', hx: 2.5, hy: .25, hz: .25 }, 400, o0, dir.clone().multiplyScalar(26 + 18 * pw), m, { expire: simTime + 8, onHit() { snd.clang(1); } }, { quat: quatTo(V(1, 0, 0), flatDir(dir)), gs: .7 });
     const ax = sideDir(); o.body.setAngularVelocity(ax.x * 9, 0, ax.z * 9); snd.whoosh();
   } });
 def('bowlrain', { label: 'Bowling Barrage', cat: 'kinetic', price: 160, emoji: '🎳', style: 'beam', desc: 'Ten bowling balls roll out in a fan along the floor',
@@ -132,7 +132,7 @@ def('fist', { label: 'Giant Fist', cat: 'kinetic', price: 340, emoji: '👊', st
         for (let i = 0; i < 40; i++) { const a = rand(0, 6.28); spawnSmoke(target.x + Math.cos(a) * 2, .4, target.z + Math.sin(a) * 2, Math.cos(a) * rand(4, 8), rand(.2, 1), Math.sin(a) * rand(4, 8), rand(1.2, 2.2), rand(1, 2), [.72, .66, .58], .6); }
         snd.boom(); snd.rumble(); shake = 1.1; bulletUntil = simTime + .25; } }
       else if (k > 1.2) m.position.y += dt * 40;
-    }, { end() { scene.remove(m); }, kill() { scene.remove(m); } });
+    }, { end() { dropMesh(m); }, kill() { dropMesh(m); } });
     snd.whoosh();
   } });
 
@@ -160,10 +160,10 @@ def('mines', { label: 'Landmines', cat: 'explosive', price: 190, emoji: '⚠️'
     for (let i = 0; i < 10; i++) { const a = rand(0, 6.28), r = rand(1.5, 5.5), p = V(target.x + Math.cos(a) * r, .1, target.z + Math.sin(a) * r);
       const m = grp(cyl(.32, .36, .14, mt, 16), at(sphereMesh(.06, lt), 0, .1, 0)); m.position.copy(p); m.scale.setScalar(.01); scene.add(m);
       const life = rand(9, 12); let armed = false, gone = false;
-      const blow = () => { if (gone) return; gone = true; scene.remove(m); explodeAt(V(p.x, .35, p.z), 1.15); };
+      const blow = () => { if (gone) return; gone = true; dropMesh(m); explodeAt(V(p.x, .35, p.z), 1.15); };
       timed(life, k => { m.scale.setScalar(Math.min(1, k * 3)); m.children[1].visible = Math.sin(simTime * 10 + i) > .3; if (gone) return false; },
         { every: .1, tick(k) { if (k > 1) armed = true; if (!armed) return; for (const o of nearObjs(V(p.x, .6, p.z), 1.5)) { const v = o.body.velocity; if (Math.hypot(v.x, v.y, v.z) > 1.2) { blow(); break; } } },
-          end: blow, kill() { scene.remove(m); } }); }
+          end: blow, kill() { dropMesh(m); } }); }
     snd.tink(.5); toast('⚠️ Minefield laid — knock something into it');
   } });
 def('airstrike', { label: 'Airstrike', cat: 'explosive', price: 360, emoji: '🛩️', style: 'strike', aoe: 6, desc: 'Six guided missiles streak in from the sky',
@@ -251,7 +251,7 @@ def('hurricane', { label: 'Hurricane', cat: 'elemental', price: 400, emoji: '�
       for (let i = 0; i < 8; i++) { const a = rand(0, 6.28), r = rand(1, 7), h = rand(0, 16); spawnP(c.x + Math.cos(a) * r, h, c.z + Math.sin(a) * r, -Math.sin(a) * 12, 4, Math.cos(a) * 12, .6, [.7, .72, .7], .3, 0, 1, .5); } },
       { every: .08, tick() { for (const o of nearObjs(V(c.x, 6, c.z), 14)) { const p = o.body.position, dx = p.x - c.x, dz = p.z - c.z, r = Math.hypot(dx, dz) || .1; if (r > 9) continue;
           const f = 1 - r / 9; push(o, (-dz / r * 3.2 - dx / r * 1.1) * f, (p.y < 14 ? 2.6 : -.5) * f, (dx / r * 3.2 - dz / r * 1.1) * f); } },
-        end() { scene.remove(funnel); }, kill() { scene.remove(funnel); } });
+        end() { dropMesh(funnel); }, kill() { dropMesh(funnel); } });
     snd.wind(); noise(4.5, 'bandpass', 300, .5, .4); toast('🌀 Hurricane!');
   } });
 def('quakeshell', { label: 'Quake Shell', cat: 'elemental', price: 300, emoji: '📳', desc: 'Buries itself and shakes the ground apart for three seconds', r: .3, mass: 8,
@@ -293,7 +293,7 @@ def('thermite', { label: 'Thermite', cat: 'elemental', price: 240, emoji: '🟧'
 def('thunder', { label: 'Thunderstorm', cat: 'elemental', price: 360, emoji: '⛈️', style: 'strike', aoe: 7, desc: 'A storm cloud rolls in and fires a dozen lightning strikes',
   fire({ target }) {
     const cloud = new THREE.Mesh(new THREE.SphereGeometry(8, 18, 10), new THREE.MeshBasicMaterial({ color: 0x3a3f48, transparent: true, opacity: 0, depthWrite: false })); cloud.scale.y = .25; cloud.position.set(target.x, 26, target.z); scene.add(cloud);
-    timed(5.5, k => { cloud.material.opacity = .6 * Math.min(1, k * 2, (5.5 - k) * 2); }, { end() { scene.remove(cloud); }, kill() { scene.remove(cloud); } });
+    timed(5.5, k => { cloud.material.opacity = .6 * Math.min(1, k * 2, (5.5 - k) * 2); }, { end() { dropMesh(cloud); }, kill() { dropMesh(cloud); } });
     for (let i = 0; i < 12; i++) later(.6 + i * .38 + rand(0, .15), () => { const p = V(target.x + rand(-6, 6), 0, target.z + rand(-6, 6));
       const top = nearObjs(V(p.x, 8, p.z), 16, o => isBlock(o) && hdist(o, p) < 1.5).reduce((a, o) => Math.max(a, o.body.position.y + .5), .2); p.y = top;
       boltFX(V(p.x + rand(-3, 3), 25, p.z + rand(-3, 3)), p); flash.color.setHex(0xa8d8ff); flash.position.copy(p); flash.intensity = 110;
@@ -315,7 +315,7 @@ def('magma', { label: 'Magma Flood', cat: 'elemental', price: 330, emoji: '🫗'
       flash.color.setHex(0xff5010); flash.position.set(c.x, 1, c.z); flash.intensity = 20; },
       { every: .15, tick() { for (const o of nearObjs(V(c.x, 1, c.z), R + 1.5, o => isBlock(o) && hdist(o, c) < R && o.body.getAABB().lowerBound.y < .6)) {
           ignite(o, .5); push(o, 0, .8, 0); if (o.mat === 'ice' || Math.random() < .08) vaporize(o, [1, .45, .1], 5); } },
-        end() { scene.remove(pool); }, kill() { scene.remove(pool); } });
+        end() { dropMesh(pool); }, kill() { dropMesh(pool); } });
     snd.quake(); toast('🫗 Magma rising');
   } });
 
@@ -325,7 +325,7 @@ def('whitehole', { label: 'White Hole', cat: 'exotic', price: 420, emoji: '🤍'
     const c = V(target.x, Math.max(1, target.y), target.z), orb = grp(sphereMesh(.6, glowMat(0xffffff, 1)), sphereMesh(1.2, glowMat(0xd8e8ff, .35))); orb.position.copy(c); scene.add(orb);
     timed(3, (k, dt) => { const s = 1 + .2 * Math.sin(k * 20); orb.scale.setScalar(s * Math.min(1, k * 4, (3 - k) * 4)); flash.color.setHex(0xe8f0ff); flash.position.copy(c); flash.intensity = 50;
       for (let i = 0; i < 6; i++) { const v = V(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize(); spawnP(c.x, c.y, c.z, v.x * 14, v.y * 14, v.z * 14, .5, [.9, .95, 1], .2, 0, 0); } },
-      { every: .08, tick() { radialPush(c, 11, 3.2, .15); }, end() { scene.remove(orb); ringFX(c, 2, 0xe8f0ff); }, kill() { scene.remove(orb); } });
+      { every: .08, tick() { radialPush(c, 11, 3.2, .15); }, end() { dropMesh(orb); ringFX(c, 2, 0xe8f0ff); }, kill() { dropMesh(orb); } });
     snd.hole(); whiteFlash(.3, .6);
   } });
 def('timebubble', { label: 'Time Bubble', cat: 'exotic', price: 300, emoji: '⏳', style: 'strike', aoe: 5, desc: 'Freezes time inside a bubble — smash it, then watch it all fall at once',
@@ -335,7 +335,7 @@ def('timebubble', { label: 'Time Bubble', cat: 'exotic', price: 300, emoji: '⏳
     timed(5, k => { bub.material.opacity = .12 * Math.min(1, k * 4, (5 - k) * 3); },
       { every: .016, tick() { for (const o of nearObjs(c, R)) { const v = o.body.velocity, w = o.body.angularVelocity; if (Math.abs(v.x) + Math.abs(v.y) + Math.abs(v.z) < .02) continue;
           o.body.setVelocity(v.x * .1, v.y * .1 + .33, v.z * .1); o.body.setAngularVelocity(w.x * .1, w.y * .1, w.z * .1); } },
-        end() { scene.remove(bub); snd.whoosh(); }, kill() { scene.remove(bub); } });
+        end() { dropMesh(bub); snd.whoosh(); }, kill() { dropMesh(bub); } });
     snd.ding(); toast('⏳ Time stopped — keep smashing');
   } });
 def('teleport', { label: 'Teleporter', cat: 'exotic', price: 280, emoji: '🚪', style: 'beam', desc: 'Beams a chunk of the tower 15 m up — then gravity takes over',
@@ -360,7 +360,7 @@ def('gwell', { label: 'Gravity Well', cat: 'exotic', price: 360, emoji: '🪐', 
     timed(3, k => { core.scale.setScalar(1 + k * .6); const a = rand(0, 6.28), r = rand(3, 7); spawnP(c.x + Math.cos(a) * r, c.y + rand(-2, 2), c.z + Math.sin(a) * r, -Math.cos(a) * 8, 0, -Math.sin(a) * 8, .7, [.7, .55, 1], .2, 0, -.5); },
       { every: .06, tick() { for (const o of nearObjs(c, 9)) { const p = o.body.position, d = V(c.x - p.x, c.y - p.y, c.z - p.z), L = d.length() || .1;
           const v = o.body.velocity, f = Math.min(6, 30 / (1 + L)); o.body.setVelocity(v.x * .85 + d.x / L * f, v.y * .85 + d.y / L * f + .2, v.z * .85 + d.z / L * f); } },
-        end() { scene.remove(core); explodeAt(c, 1.7, 'plasma'); }, kill() { scene.remove(core); } });
+        end() { dropMesh(core); explodeAt(c, 1.7, 'plasma'); }, kill() { dropMesh(core); } });
     snd.hole();
   } }); snd.whoosh(); } });
 def('rod', { label: 'Rod from God', cat: 'exotic', price: 620, emoji: '🥢', style: 'strike', aoe: 3, desc: 'A tungsten rod dropped from orbit. No explosive needed.',
@@ -368,10 +368,10 @@ def('rod', { label: 'Rod from God', cat: 'exotic', price: 620, emoji: '🥢', st
     const c = V(target.x, 0, target.z), rod = cyl(.18, .18, 6, glowMat(0xfff0c0, 1), 10); rod.position.set(c.x, 90, c.z); scene.add(rod);
     snd.wind(); toast('🥢 Incoming from orbit…');
     timed(1.2, (k, dt) => { rod.position.y = Math.max(0, 90 - k * k * 62); for (let i = 0; i < 4; i++) spawnP(c.x + rand(-.2, .2), rod.position.y + 3 + rand(0, 6), c.z + rand(-.2, .2), 0, 6, 0, .5, [1, .8, .5], .3, 0, 1, .8); },
-      { end() { scene.remove(rod); let n = 0;
+      { end() { dropMesh(rod); let n = 0;
           for (const o of nearObjs(V(c.x, 10, c.z), 40, o => isBlock(o) && hdist(o, c) < 1.4)) { vaporize(o, [1, .8, .5], 3); n++; }
           explodeAt(V(c.x, .5, c.z), 2.4); crackNear(V(c.x, 2, c.z), 4.5, .8); whiteFlash(.8, 1.2); bulletUntil = simTime + .6; snd.nuke(); if (n) toast(`🥢 Punched through ${n}`); },
-        kill() { scene.remove(rod); } });
+        kill() { dropMesh(rod); } });
   } });
 def('plasma', { label: 'Plasma Cannon', cat: 'exotic', price: 340, emoji: '🔵', style: 'beam', desc: 'A slow ball of plasma that burns through everything, then bursts',
   fire({ o0, dir }) {
@@ -379,13 +379,13 @@ def('plasma', { label: 'Plasma Cannon', cat: 'exotic', price: 340, emoji: '🔵'
     timed(2.6, (k, dt) => { p.addScaledVector(dir, 17 * dt); orb.position.copy(p); orb.rotation.y += dt * 8; flash.color.setHex(0x4a9aff); flash.position.copy(p); flash.intensity = 35;
       spawnP(p.x, p.y, p.z, rand(-1, 1), rand(-1, 1), rand(-1, 1), .4, [.4, .7, 1], .5, 0, -1, .8); if (p.y < .3) return false; },
       { every: .05, tick() { for (const o of nearObjs(p, 1.4, isBlock)) { vaporize(o, [.5, .8, 1], 4); ate++; } },
-        end() { scene.remove(orb); explodeAt(p.clone(), 1.6, 'plasma'); if (ate) toast(`🔵 Burned ${ate}`); }, kill() { scene.remove(orb); } });
+        end() { dropMesh(orb); explodeAt(p.clone(), 1.6, 'plasma'); if (ate) toast(`🔵 Burned ${ate}`); }, kill() { dropMesh(orb); } });
     snd.laser();
   } });
 def('repulsor', { label: 'Repulsor Beam', cat: 'exotic', price: 240, emoji: '🖐️', style: 'beam', desc: 'A steady push beam — shoves whatever you aim at for two seconds',
   fire({ o0, target }) {
-    const dir = V(target.x - o0.x, target.y - o0.y, target.z - o0.z).normalize(); let beam = null;
-    timed(2, () => { if (beam) scene.remove(beam); beam = beamFX(o0, target, 0xffe070, .18, .05); },
+    const dir = V(target.x - o0.x, target.y - o0.y, target.z - o0.z).normalize(); beamFX(o0, target, 0xffe070, .18, 2);
+    timed(2, null,
       { every: .05, tick() { for (const o of rayBlocks(o0, dir, o0.distanceTo(target) + 6, 2.4, null).slice(0, 80)) push(o, dir.x * .9, dir.y * .9 + .15, dir.z * .9); } });
     noise(2, 'bandpass', 900, .25, 4); snd.zap();
   } });
@@ -416,7 +416,7 @@ def('cow', { label: 'Flying Cow', cat: 'silly', price: 120, emoji: '🐄', style
     for (const [x, z] of [[-.7, -.3], [-.7, .3], [.6, -.3], [.6, .3]]) g.add(at(box(.18, .6, .18, w), x, -.75, z)); return g; },
   fire({ target }) {
     const side = sideDir(), from = V(target.x - side.x * 22, target.y + 6, target.z - side.z * 22), m = ARSENAL.cow.mesh();
-    const o = spawnBody('cow', { kind: 'box', hx: .9, hy: .65, hz: .45 }, 600, from, arcVel(from, V(target.x, target.y + 1, target.z), 30), m, { expire: simTime + 9, onHit() { snd.boing(); shake = .5; } }, { quat: quatTo(V(1, 0, 0), side) });
+    const o = spawnBody('cow', { kind: 'box', hx: .9, hy: .65, hz: .45 }, 600, from, arcVel(from, V(target.x, target.y + 1, target.z), 30), m, { expire: simTime + 9, onHit() { snd.boing(1); shake = .5; } }, { quat: quatTo(V(1, 0, 0), side) });
     o.body.setAngularVelocity(rand(-2, 2), rand(-2, 2), rand(-2, 2)); tone(180, 120, .7, .25); toast('🐄 Moooo!');
   } });
 def('jelly', { label: 'Jelly Cube', cat: 'silly', price: 90, emoji: '🟩', style: 'strike', aoe: 3, desc: 'A giant wobbly jelly drops in and bounces all over your build',
@@ -425,7 +425,7 @@ def('jelly', { label: 'Jelly Cube', cat: 'silly', price: 90, emoji: '🟩', styl
     const o = spawnBody('jelly', { kind: 'box', hx: 1.2, hy: 1.2, hz: 1.2 }, 160, V(target.x, target.y + 20, target.z), V(0, -5, 0), ARSENAL.jelly.mesh(), { expire: simTime + 10 }, { rest: .95, fric: .3 });
     o.body.setAngularVelocity(rand(-2, 2), rand(-1, 1), rand(-2, 2));
     AFX.push({ upd() { if (o.gone) return false; const v = o.body.velocity, s = Math.min(.25, Math.hypot(v.x, v.y, v.z) * .01); o.mesh.scale.set(1 + s * Math.sin(simTime * 25), 1 - s * Math.sin(simTime * 25), 1 + s * Math.sin(simTime * 25)); } });
-    snd.boing();
+    snd.boing(1);
   } });
 def('confetti', { label: 'Confetti Cannon', cat: 'silly', price: 80, emoji: '🎉', style: 'beam', desc: 'A blast of party paper — and 30 surprisingly heavy party favours',
   fire({ o0, dir }) {
@@ -440,7 +440,7 @@ def('sink', { label: 'Kitchen Sink', cat: 'silly', price: 140, emoji: '🚰', de
   fire(ctx) {
     lob('sink', ctx); const mats = [stdMat(0xf8f8f0), stdMat(0x2a2a2a, { metalness: .5 }), stdMat(0xd04030)];
     for (let i = 0; i < 12; i++) later(.05 + i * .03, () => { const v = ctx.vel.clone().add(V(rand(-2, 2), rand(-1, 2), rand(-2, 2))), r = rand(.15, .3);
-      const o = spawnBody('junk', i % 3 ? { kind: 'cyl', r, hh: .05 } : { kind: 'ball', r }, 6, ctx.o0, v, i % 3 ? cyl(r, r, .1, mats[i % 3], 12) : sphereMesh(r, mats[2]), { expire: simTime + 7, onHit() { if (Math.random() < .3) snd.clang(); } });
+      const o = spawnBody('junk', i % 3 ? { kind: 'cyl', r, hh: .05 } : { kind: 'ball', r }, 6, ctx.o0, v, i % 3 ? cyl(r, r, .1, mats[i % 3], 12) : sphereMesh(r, mats[2]), { expire: simTime + 7, onHit() { if (Math.random() < .3) snd.clang(1); } });
       o.body.setAngularVelocity(rand(-8, 8), rand(-8, 8), rand(-8, 8)); });
     snd.whoosh();
   } });
@@ -453,7 +453,7 @@ def('snowballs', { label: 'Snowball Volley', cat: 'silly', price: 60, emoji: '�
 def('beachball', { label: 'Beach Ball', cat: 'silly', price: 70, emoji: '🏖️', desc: 'A huge, floaty, bouncy beach ball. Weirdly effective.', r: 1.5, mass: 40, rest: .85,
   mesh: () => { const g = new THREE.Group(), cols = [0xff3a3a, 0xffffff, 0x3a7aff, 0xffd23a, 0xffffff, 0x3ac06a];
     for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 14, i / 6 * 6.28, 6.28 / 6), stdMat(cols[i], { roughness: .3 })); m.castShadow = true; g.add(m); } return g; },
-  fire(ctx) { lob('beachball', ctx, {}, { gs: .45, rest: .85, ld: .3 }); snd.boing(); } });
+  fire(ctx) { lob('beachball', ctx, {}, { gs: .45, rest: .85, ld: .3 }); snd.boing(1); } });
 def('tire', { label: 'Monster Tire', cat: 'silly', price: 210, emoji: '🛞', style: 'beam', desc: 'A 3 m monster-truck tyre comes rolling at your build',
   mesh: () => { const t = new THREE.Mesh(new THREE.TorusGeometry(1.05, .5, 12, 28), stdMat(0x1c1c1c, { roughness: .9 })), hub = cyl(.6, .6, .7, stdMat(0xb8bec6, { metalness: .7 }), 16); hub.rotation.x = Math.PI / 2; t.castShadow = true; return grp(t, hub); },
   fire({ o0, target }) {

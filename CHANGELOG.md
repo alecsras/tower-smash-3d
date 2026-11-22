@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 — Grid designer
+
+- New Grid designer (Build Library → Create, or More build tools): draw a build from above on a grid you size yourself (4 to 48 each way). Each cell is a column of blocks.
+- Tools: Paint (drag), Erase, Box and Circle (outline or filled), Fill, Raise and Lower one block, Layer (recolour one layer across many cells — stripes and windows), and Edit cell (set one column's height and material, and recolour any single block in it).
+- 14 materials, mirror left/right, front/back or both, undo/redo, a live block count (limit 8,000), an autosaved draft and up to 24 named designs.
+- Build it puts the design on the pad, centred, with the bottom edge of the grid facing you.
+
 ## 0.13.1 — Weapon crash fixes
 
 - Fixed a crash (the "reload" screen) when using Golf Barrage, Javelin, Steel Girder, Falling Safe, Kitchen Sink, Flying Cow, Jelly Cube or Beach Ball: some sounds were played without a volume. Every sound now has a safe default and bad values are ignored instead of crashing.

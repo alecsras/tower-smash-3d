@@ -1,0 +1,37 @@
+/* ===== grid designer ===== */
+#gridd{position:fixed;inset:0;z-index:15;background:var(--cream);display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(16px);transition:opacity var(--mid),transform var(--mid) var(--ease);color:var(--ink)}
+#gridd.open{opacity:1;pointer-events:auto;transform:none}
+body.gridopen #toast,body.gridopen #coach{z-index:30}
+.gdhead{display:flex;align-items:center;gap:8px;padding:calc(var(--top, 0px) + 8px) 10px 8px;border-bottom:2px solid var(--line);background:#fff}
+.gdhead b{font-size:var(--t16);font-weight:900;flex:1}
+#gdCount{font:800 var(--t12)/1 var(--font);background:var(--cream-2);border-radius:var(--pill);padding:6px 10px;color:var(--ink-2)}
+#gdCount.warn{background:#fff1d6;color:#8a5a00}#gdCount.bad{background:#ffe1df;color:var(--danger)}
+.gdicon{width:var(--tap);height:var(--tap);border:0;border-radius:var(--r10);background:var(--cream-2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation}
+.gdicon:disabled{opacity:.35}
+.gdbody{flex:1;min-height:0;display:flex;flex-direction:column;max-width:640px;width:100%;margin:0 auto;box-sizing:border-box}
+#gdPanel{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px 12px;border-top:2px solid var(--line)}
+.gdwrap{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px 6px}
+.gdedge{font:800 11px/1 var(--font);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:2px}
+#gdCanvas{display:block;border-radius:var(--r10);box-shadow:inset 0 0 0 2px var(--line),var(--shadow);touch-action:none;cursor:crosshair;background:#efe9dd}
+#gdPanel .lab{font-weight:800;font-size:12px;color:#5a6578;text-transform:uppercase;letter-spacing:.04em;margin:10px 2px 6px}
+.gdtools{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.gdtool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:54px;border:2px solid var(--line);background:#fff;border-radius:var(--r16);font:800 11px/1.1 var(--font);color:var(--ink);cursor:pointer;touch-action:manipulation;padding:4px 2px}
+.gdtool.on{border-color:var(--orange);background:#fff4ea}
+.gdtip{font:600 13px/1.35 var(--font);color:var(--ink-2);margin:8px 2px 0}
+.gdrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gdmats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.gdsw{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;border:2px solid transparent;background:#fff;border-radius:var(--r10);padding:5px 6px;min-width:56px;font:800 11px/1 var(--font);color:var(--ink);cursor:pointer;touch-action:manipulation}
+.gdsw i{display:block;width:28px;height:28px;border-radius:7px;background:var(--c);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.gdsw.on{border-color:var(--orange);background:#fff4ea}
+.gdcol{background:#fff;border-radius:var(--r16);padding:4px 10px 10px;margin-top:8px;box-shadow:var(--shadow)}
+.gdstack{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto;width:120px}
+.gdblk{border:0;border-radius:6px;min-height:30px;font:800 12px/1 var(--font);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);cursor:pointer;touch-action:manipulation}
+.gdname{flex:1;min-width:140px;border:2px solid var(--line);border-radius:var(--r10);padding:9px 10px;font:700 15px/1 var(--font);background:#fff;color:var(--ink)}
+.gdlist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.gditem{display:flex;align-items:center;gap:6px;background:#fff;border-radius:var(--r10);padding:6px 8px}
+.gditem b{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gditem small{color:var(--muted);font-weight:700;font-size:12px;white-space:nowrap}
+.gdfoot{padding:10px 12px calc(var(--bot, 0px) + 10px);background:#fff;border-top:2px solid var(--line);display:flex;justify-content:center}
+.gdfoot .btn{width:100%;max-width:520px;min-height:var(--tap-l);font-size:18px}
+.btn.gdopen{width:100%;flex-direction:column;gap:4px;min-height:64px;margin:6px 0 4px;padding:10px 16px;white-space:normal}
+.btn.gdopen>span{font-size:17px}.btn.gdopen small{font:700 12px/1.2 var(--font);opacity:.9}
+.btn.gdopen .ico{display:none}

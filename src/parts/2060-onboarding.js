@@ -77,5 +77,5 @@ function finishTraining(skipped) {
 }
 
 // ---- What's new: returning players only, once per update ----
-const NEWS_ID = 'v0.13.0';
+const NEWS_ID = 'v0.14.0';
 function maybeNews() { if (SAVE.trained && SAVE.seenNews !== NEWS_ID) setTimeout(() => $('news').classList.add('open'), 500); }

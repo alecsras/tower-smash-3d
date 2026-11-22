@@ -192,6 +192,7 @@ function cbStepper(parent, label, val, min, max, on, step = 1) {
 function cbLabel(parent, txt) { const h = document.createElement('div'); h.className = 'lab'; h.textContent = txt; parent.appendChild(h); }
 function renderCustom() {
   const f = $('cform'), c = cbCfg; f.innerHTML = '';
+  const gbtn = mkBtn('Grid3x3', 'Grid designer', openGrid, { cls: 'btn primary gdopen' }); gbtn.insertAdjacentHTML('beforeend', '<small>Draw it from above, set every block’s height and material</small>'); f.appendChild(gbtn);
   renderAI(f);
   cbLabel(f, 'Shape');
   cbChips(f, Object.entries(CB_SHAPES), c.shape, k => {

@@ -288,6 +288,7 @@ $('library').addEventListener('click', e => { if (e.target.id === 'library') clo
 function openMore() {
   const L = $('moreList'); L.innerHTML = '';
   const add = (icon, label, note, fn, cls = '') => { const b = mkBtn(icon, label, fn, { cls: 'mrow ' + cls }); if (note) b.insertAdjacentHTML('beforeend', `<small>${note}</small>`); L.appendChild(b); };
+  add('Grid3x3', 'Grid designer', 'Draw a build from above', () => { $('more').classList.remove('open'); openGrid(); });
   add('ArrowUpDown', 'Layer height', `${HEIGHTS[toolH]} high`, () => { toolH = (toolH + 1) % HEIGHTS.length; renderToolbar(); openMore(); });
   add('FlipHorizontal2', 'Mirror', mirrorX ? 'On' : 'Off', () => { mirrorX = !mirrorX; renderToolbar(); openMore(); });
   add('Palette', 'Materials', 'Repaint everything on the pad', () => {
@@ -328,7 +329,7 @@ $('titleVer').textContent = 'Test build ' + VERSION_STR;
 document.body.classList.toggle('camarrows', !!SAVE.camArrows);
 if (DEBUG) document.body.classList.add('debug');
 // Escape / back closes the top-most sheet
-addEventListener('keydown', e => { if (e.key !== 'Escape') return; const open = [...document.querySelectorAll('.msheet.open,.dialog.open')].pop(); if (open) { open.classList.remove('open'); if (open.id === 'pause') paused = false; } else if (screen === 'game') openPause(); });
+addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (document.body.classList.contains('gridopen') && !document.querySelector('.dialog.open')) { closeGrid(); return; } const open = [...document.querySelectorAll('.msheet.open,.dialog.open')].pop(); if (open) { open.classList.remove('open'); if (open.id === 'pause') paused = false; } else if (screen === 'game') openPause(); });
 let fpsAvg = 0;
 // iPhone: unlock sound on the first touch anywhere, and resume it after calls or app switches
 document.addEventListener('pointerdown', () => initAudio(), { capture: true, passive: true });

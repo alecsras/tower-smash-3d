@@ -69,7 +69,8 @@ test('graphics tiers: Settings offers Auto/High/Balanced/Light and Light turns o
   const errors = await open(page);
   const r = await page.evaluate(() => {
     const g = window.__game; g.openSettings();
-    const labels = [...document.querySelectorAll('#settingsBody .segtabs button')].map(b => b.textContent);
+    const row = [...document.querySelectorAll('#settingsBody .segtabs')].find(s => s.textContent.includes('Auto'));
+    const labels = [...row.querySelectorAll('button')].map(b => b.textContent);
     g.SAVE.quality = 'lite'; g.applyQuality(); const lite = { shadow: g.sunShadow, pr: g.renderer.getPixelRatio() };
     g.SAVE.quality = 'high'; g.applyQuality(); const high = { shadow: g.sunShadow };
     return { labels, lite, high };

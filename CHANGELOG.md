@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.0 — Doodle art style
+
+- New art style, Doodle (Settings → Art style): the whole game drawn like a sketch on notebook paper. Wobbly ink outlines that redraw a few times a second like hand-drawn animation, flat crayon colour, pencil hatching in shadows, paper grain, and a ruled-paper sky with a red margin line. Night turns it into a chalkboard.
+- The menus switch too: hand-lettered font, paper cards with ink outlines and wobbly corners, marker shadows, and highlighter yellow for whatever's selected.
+- Classic stays the default; switch any time. Reduce motion stops the lines from re-drawing.
+
 ## 0.14.0 — Grid designer
 
 - New Grid designer (Build Library → Create, or More build tools): draw a build from above on a grid you size yourself (4 to 48 each way). Each cell is a column of blocks.

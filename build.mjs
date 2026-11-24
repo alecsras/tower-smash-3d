@@ -28,7 +28,9 @@ const engineJs = eng.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const font = w => readFileSync(`node_modules/@fontsource/nunito/files/nunito-latin-${w}-normal.woff2`).toString('base64');
 const fontCss = [700, 800, 900].filter(w => { try { font(w); return true; } catch (e) { return false; } })
   .map(w => `@font-face{font-family:'Nunito';font-weight:${w};font-display:swap;src:url(data:font/woff2;base64,${font(w)}) format('woff2')}`).join('\n');
-const css = fontCss + '\n' + readdirSync('src/styles').filter(f => f.endsWith('.css')).sort().map(f => readFileSync(`src/styles/${f}`, 'utf8')).join('\n');
+const hand = readFileSync('node_modules/@fontsource/patrick-hand/files/patrick-hand-latin-400-normal.woff2').toString('base64');
+const handCss = `@font-face{font-family:'Patrick Hand';font-weight:400;font-display:swap;src:url(data:font/woff2;base64,${hand}) format('woff2')}`;
+const css = fontCss + '\n' + handCss + '\n' + readdirSync('src/styles').filter(f => f.endsWith('.css')).sort().map(f => readFileSync(`src/styles/${f}`, 'utf8')).join('\n');
 
 const html = readFileSync('src/index.template.html', 'utf8')
   .replace('/*STYLES*/', () => css)

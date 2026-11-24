@@ -1,0 +1,75 @@
+/* ===== Doodle art style: hand-drawn UI on paper (body.doodle) ===== */
+body.doodle{
+  --font:'Patrick Hand','Nunito',system-ui,sans-serif;
+  --ink:#24262e; --ink-2:#3d404a; --muted:#6b6a66;
+  --cream:#fbf6ea; --cream-2:#f1e9d6; --line:#2b2d35; --white:#fffdf7;
+  --orange:#ff8a3d; --orange-d:#e86f22; --gold:#ffd84d;
+  --glass:rgba(255,252,243,.93); --glass-2:rgba(255,252,243,.97); --blur:none;
+  /* wobbly, hand-drawn corners: every box is a little different from a perfect rectangle */
+  --r10:12px 5px 11px 6px/6px 11px 5px 12px; --r16:18px 7px 16px 6px/7px 16px 8px 18px; --r24:26px 9px 22px 8px/9px 24px 10px 26px;
+  --pill:255px 15px 225px 15px/15px 225px 15px 255px;
+  --shadow:2px 3px 0 rgba(36,38,46,.85); --shadow-l:3px 4px 0 rgba(36,38,46,.9);
+  --hl:#fff07a;   /* highlighter */
+  font-size-adjust:.52; letter-spacing:.01em;
+}
+body.doodle, body.doodle input, body.doodle button, body.doodle textarea, body.doodle select{font-family:var(--font)}
+body.doodle b, body.doodle strong, body.doodle h1, body.doodle h2, body.doodle h3{font-weight:400;letter-spacing:.02em}
+body.doodle .msheet, body.doodle .dialog .sheet, body.doodle #gridd, body.doodle .screen{
+  background-color:var(--cream);
+  background-image:linear-gradient(rgba(120,160,210,.16) 1px, transparent 1px);
+  background-size:100% 30px;
+}
+
+/* ---- buttons, chips, cards: ink outline + offset marker shadow ---- */
+body.doodle .btn, body.doodle .chip, body.doodle .mrow, body.doodle .card, body.doodle .tile, body.doodle .item, body.doodle .dcard,
+body.doodle .gdtool, body.doodle .gdsw, body.doodle .gditem, body.doodle .gdcol, body.doodle .pfcard, body.doodle .world, body.doodle .icard,
+body.doodle .field, body.doodle .gdname, body.doodle .tog, body.doodle .setrow, body.doodle .stp, body.doodle .seg button, body.doodle .segtabs button{
+  border:2px solid var(--line)!important; box-shadow:var(--shadow)!important; background-image:none;
+}
+body.doodle .btn, body.doodle .chip, body.doodle .seg button, body.doodle .segtabs button{border-radius:var(--pill)!important}
+body.doodle .card, body.doodle .tile, body.doodle .item, body.doodle .dcard, body.doodle .gdtool, body.doodle .gdsw, body.doodle .gditem,
+body.doodle .gdcol, body.doodle .pfcard, body.doodle .world, body.doodle .icard, body.doodle .mrow, body.doodle .tog, body.doodle .setrow{border-radius:var(--r16)!important}
+body.doodle .btn:active, body.doodle .chip:active, body.doodle .item:active, body.doodle .mrow:active, body.doodle .gdtool:active, body.doodle .tl:active{transform:translate(2px,2px) rotate(0)!important;box-shadow:0 0 0 var(--line)!important}
+body.doodle .btn.primary{background:var(--orange)!important;color:#1e1f25!important;transform:rotate(-.6deg)}
+body.doodle .btn.secondary, body.doodle .btn.ghost{background:var(--white)!important;color:var(--ink)!important}
+body.doodle .btn.danger{background:#ff9b8f!important;color:#1e1f25!important}
+/* selected = highlighter swipe */
+body.doodle .chip.on, body.doodle .item.on, body.doodle .gdtool.on, body.doodle .gdsw.on, body.doodle .segtabs button.on, body.doodle .seg button.on,
+body.doodle .tl.on, body.doodle #cats button.on, body.doodle #modeSeg button.on, body.doodle .cb.on, body.doodle .ib.on{
+  background:var(--hl)!important; color:var(--ink)!important; border-color:var(--line)!important;
+}
+body.doodle .item:nth-child(3n+1), body.doodle .card:nth-child(3n+1), body.doodle .dcard:nth-child(2n){transform:rotate(-.5deg)}
+body.doodle .item:nth-child(3n+2), body.doodle .card:nth-child(3n+2), body.doodle .dcard:nth-child(2n+1){transform:rotate(.45deg)}
+
+/* ---- HUD over the 3D view: paper tags instead of dark glass ---- */
+body.doodle .iconbtn, body.doodle #hud, body.doodle #coinBtn, body.doodle #modeSeg, body.doodle .tl, body.doodle #cats button, body.doodle #camOpts button{
+  background:var(--glass)!important; color:var(--ink)!important; border:2px solid var(--line)!important; box-shadow:var(--shadow)!important;
+  -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+}
+body.doodle .iconbtn{border-radius:52% 48% 50% 46%/47% 52% 48% 53%!important}
+body.doodle #hud, body.doodle #coinBtn, body.doodle #cats button{border-radius:var(--pill)!important}
+body.doodle .tl{border-radius:var(--r16)!important}
+body.doodle #modeSeg{border-radius:var(--pill)!important;padding:2px}
+body.doodle #modeSeg button{color:var(--ink)!important;border-radius:var(--pill)!important}
+body.doodle .iconbtn svg, body.doodle .tl svg, body.doodle #hud svg, body.doodle #coinBtn svg, body.doodle #modeSeg svg{color:var(--ink);stroke:var(--ink)}
+body.doodle #tray{background:transparent!important}
+body.doodle #toast{background:var(--white)!important;color:var(--ink)!important;border:2px solid var(--line);box-shadow:var(--shadow-l);border-radius:var(--r16)!important;font-size:18px}
+body.doodle #toast.warn{background:#ffe0d8!important}
+body.doodle #coach{background:var(--white)!important;color:var(--ink)!important;border:2px solid var(--line)!important;box-shadow:var(--shadow-l)!important;border-radius:var(--r16)!important}
+body.doodle .msheet, body.doodle .dialog .sheet{border:2px solid var(--line);border-bottom:0;box-shadow:0 -3px 0 rgba(36,38,46,.85)}
+body.doodle .lab, body.doodle #gdPanel .lab{color:var(--ink-2);font-size:15px;letter-spacing:.06em;text-decoration:underline wavy rgba(255,138,61,.7);text-underline-offset:4px}
+body.doodle .badge{border:1.5px solid var(--line)}
+body.doodle .gdblk, body.doodle .gdsw i{border:1.5px solid var(--line);box-shadow:none}
+body.doodle #gdCanvas{box-shadow:inset 0 0 0 2px var(--line),var(--shadow)}
+body.doodle .gdhead, body.doodle .gdfoot{background:var(--cream);border-color:var(--line)}
+
+/* ---- the logo: a marker-drawn wobble ---- */
+body.doodle .logo text{font-family:'Patrick Hand',Nunito,sans-serif}
+body.doodle .logo{filter:url(#doodleWobble)}
+body.calm.doodle .logo{filter:none}
+
+/* ---- lettering over the 3D view: inked, with a paper halo so it reads on any background ---- */
+body.doodle #hint{color:var(--ink)!important;font-weight:400!important;font-size:22px;text-shadow:0 0 3px #fffdf5,0 0 6px #fffdf5,0 0 10px rgba(255,253,245,.9)!important}
+body.doodle .pop{font-weight:400;font-size:28px;color:var(--orange-d);-webkit-text-stroke:1px var(--line);text-shadow:2px 2px 0 rgba(36,38,46,.85)}
+body.doodle .pop.coin{color:#e0a800;font-size:20px}
+body.doodle .pop.mult{color:#2f8fd8;font-size:30px}

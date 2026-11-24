@@ -118,6 +118,11 @@ function openSettings() {
     r.querySelector('input').oninput = e => { SAVE.volume = e.target.value / 100; muted = SAVE.volume === 0; applyVolume(); }; r.querySelector('input').onchange = () => { persist(); snd.ding(); }; B.appendChild(r); }
   tog('hapChk', 'Vibration', 'Buzz on big hits and explosions (Android only)', SAVE.haptics, v => { SAVE.haptics = v; persist(); if (v) haptic(40); });
   tog('calmChk', 'Reduce motion', 'No screen shake, flashes or bouncy animations', !!SAVE.calm, v => { SAVE.calm = v; persist(); document.body.classList.toggle('calm', v); });
+  lab('Art style');
+  { const s = document.createElement('div'); s.className = 'segtabs';
+    for (const [k, t] of [['classic', 'Classic'], ['doodle', 'Doodle']]) { const b = document.createElement('button'); b.textContent = t; b.className = (SAVE.art || 'classic') === k ? 'on' : '';
+      b.onclick = () => { SAVE.art = k; persist(); applyArt(); logAct('art ' + k); openSettings(); }; s.appendChild(b); }
+    B.appendChild(s); B.insertAdjacentHTML('beforeend', '<div class="sub" style="margin:0 2px">Doodle draws the whole game like a sketch on notebook paper — ink outlines, pencil shading and a hand-lettered menu.</div>'); }
   lab('Graphics');
   { const s = document.createElement('div'); s.className = 'segtabs';
     for (const [k, t] of [['auto', 'Auto'], ['high', 'High'], ['low', 'Balanced'], ['lite', 'Light']]) { const b = document.createElement('button'); b.textContent = t; b.className = SAVE.qmode === k ? 'on' : '';

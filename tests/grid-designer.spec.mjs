@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { open } from './helpers.mjs';
 // the designer slides in; measure the grid only once it has stopped moving
 async function gridBox(page) {
+  await page.waitForFunction(() => { const s = getComputedStyle(document.getElementById('gridd')); return s.opacity === '1' && (s.transform === 'none' || s.transform === 'matrix(1, 0, 0, 1, 0, 0)'); });
   let prev = null;
   for (let k = 0; k < 40; k++) { const b = await page.locator('#gdCanvas').boundingBox(); if (b && prev && b.y === prev.y && b.width === prev.width && b.width > 50) return b; prev = b; await page.waitForTimeout(60); }
   return prev;

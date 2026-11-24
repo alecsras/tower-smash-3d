@@ -4,7 +4,7 @@ import { open } from './helpers.mjs';
 
 export async function checkDoodle(page) {
   const shaderErrors = [];
-  page.on('console', m => { if (/Shader Error|WebGLProgram|VALIDATE_STATUS|shader|GL_INVALID/i.test(m.text())) shaderErrors.push(m.text().slice(0, 300)); });   // graphics errors only; Safari logs unrelated file:// notices
+  page.on('console', m => { if (/Shader Error|VALIDATE_STATUS|GL_INVALID|ERROR: 0:|Program Info Log/.test(m.text())) shaderErrors.push(m.text().slice(0, 300)); });   // graphics errors only; Safari logs unrelated file:// notices
   const errors = await open(page);
   // switch through Settings like a player would
   await page.evaluate(() => window.__game.openSettings());

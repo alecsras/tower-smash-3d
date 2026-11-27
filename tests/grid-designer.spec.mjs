@@ -3,8 +3,12 @@ import { open } from './helpers.mjs';
 // the designer slides in; measure the grid only once it has stopped moving
 async function gridBox(page) {
   await page.waitForFunction(() => { const s = getComputedStyle(document.getElementById('gridd')); return s.opacity === '1' && (s.transform === 'none' || s.transform === 'matrix(1, 0, 0, 1, 0, 0)'); });
-  let prev = null;
-  for (let k = 0; k < 40; k++) { const b = await page.locator('#gdCanvas').boundingBox(); if (b && prev && b.y === prev.y && b.width === prev.width && b.width > 50) return b; prev = b; await page.waitForTimeout(60); }
+  let prev = null, same = 0;
+  for (let k = 0; k < 60; k++) {   // the same position and size over 4 checks in a row
+    const b = await page.locator('#gdCanvas').boundingBox();
+    same = b && prev && b.y === prev.y && b.x === prev.x && b.width === prev.width && b.height === prev.height && b.width > 50 ? same + 1 : 0;
+    if (same >= 3) return b; prev = b; await page.waitForTimeout(60);
+  }
   return prev;
 }
 
@@ -29,8 +33,13 @@ test('grid designer: every drawing tool, mirror, undo/redo and resize', async ({
   await expect(page.locator('#library')).not.toHaveClass(/open/);
 
   // paint a line at height 6 stone, fast swipe must not leave gaps
+  await page.evaluate(() => document.fonts.ready);   // header text can reflow when fonts land
   await drag(page, [[0, 0], [11, 0]]);
-  for (let i = 0; i < 12; i++) expect(await cell(page, i, 0)).toEqual({ h: 6, m: 'stone', o: null });
+  // if this ever misses, say exactly what was painted and where the grid was, so the cause is visible in CI logs
+  const diag = await page.evaluate(() => { const g = window.__game.gd, r = document.getElementById('gdCanvas').getBoundingClientRect(), rows = {};
+    g.cells.forEach((c, n) => { if (c) rows[Math.floor(n / g.w)] = (rows[Math.floor(n / g.w)] || 0) + 1; });
+    return JSON.stringify({ rows, grid: [g.w, g.l], canvas: [r.x, r.y, r.width, r.height], scrollY, tool: g.tool, h: g.h }); });
+  for (let i = 0; i < 12; i++) expect(await cell(page, i, 0), diag).toEqual({ h: 6, m: 'stone', o: null });
   // brick, height 3, mirrored left/right
   await page.locator('.gdsw[aria-label="Brick"]').click();
   await page.evaluate(() => { window.__game.gd.h = 3; });

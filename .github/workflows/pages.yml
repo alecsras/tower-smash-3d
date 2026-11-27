@@ -29,9 +29,11 @@ jobs:
         timeout-minutes: 20
         run: npx playwright install --with-deps chromium webkit || (sleep 15 && npx playwright install --with-deps chromium webkit)
       - run: npm test
-      - uses: actions/upload-artifact@v5
+      # package the site for Pages here, in the build job; the deploy job then only deploys it. Uploading and deploying in
+      # the same job raced GitHub's artifact listing ("No artifacts named github-pages were found").
+      - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
         with:
-          name: site
           path: dist
   deploy:
     needs: test                   # a failing test blocks the deploy
@@ -41,13 +43,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/download-artifact@v5
-        with:
-          name: site
-          path: dist
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
       - id: deployment
         uses: actions/deploy-pages@v5

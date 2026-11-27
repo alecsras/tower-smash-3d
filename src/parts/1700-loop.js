@@ -42,7 +42,7 @@ function tick(now) {
   // game time follows the physics actually simulated, so fuses, debris lifetimes and breakage stay in step with
   // the blocks even when physics (in a worker, or on a busy phone) falls behind the screen
   simTime += applied * STEP; prof('physics');
-  if (applied) processFractures();
+  if (applied) { processFractures(); billowDust(); }
   updateFire(); engTick(); prof('fx-logic');
   // events
   if (pendingBreak.size) { const l = [...pendingBreak]; pendingBreak.clear(); l.forEach(o => o.tnt ? explode(o, 1.15) : shatter(o)); }

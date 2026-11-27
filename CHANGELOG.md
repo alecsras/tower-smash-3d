@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0 — Smoother big collapses, more realistic rubble
+
+- Physics engine updated (Rapier 0.15): big collapses cost about 25–30% less (972 blocks: 15 → 10 ms per step; 2,960 blocks: 38 → 26 ms).
+- Background physics is now on by default on phones with 4+ cores: physics runs on its own thread, so the screen and touch stay smooth while a big collapse is worked out. It falls back to the main thread automatically, and can be turned off in Settings.
+- In big collapses (600+ moving blocks), rubble that has nearly stopped settles sooner, so a collapse gets cheaper as it lands (about 15% on a 3,000-block collapse).
+- Broken pieces now look like jagged, chipped rubble instead of neat boxes (four shapes, drawn only — physics stays the same).
+- Collapse dust: where a lot of mass hits the ground at once, a low dust cloud rolls out, coloured by the material.
+- Tested and rejected: running physics at 30 steps a second halved the cost but let blocks sink into the ground, so it stays at 60.
+
 ## 0.15.0 — Doodle art style
 
 - New art style, Doodle (Settings → Art style): the whole game drawn like a sketch on notebook paper. Wobbly ink outlines that redraw a few times a second like hand-drawn animation, flat crayon colour, pencil hatching in shadows, paper grain, and a ruled-paper sky with a red margin line. Night turns it into a chalkboard.

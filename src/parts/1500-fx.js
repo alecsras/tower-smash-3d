@@ -23,7 +23,7 @@ function fracture(o) {
     const body = new P.PBody({ shape: { kind: 'box', hx: s[0] / 2, hy: s[1] / 2, hz: s[2] / 2 }, density: DENS[mat], pos: new V3(p.x + wo.x, p.y + wo.y, p.z + wo.z), quat: q.clone() });
     body.velocity.set(v.x + wo.x / ol * kick, v.y + wo.y / ol * kick + .5, v.z + wo.z / ol * kick);
     body.angularVelocity.set(rand(-3, 3), rand(-3, 3), rand(-3, 3));
-    const spec = Bx(mat, s[0], s[1], s[2]);
+    const spec = Bx(mat, s[0], s[1], s[2]); spec.chunk = Math.floor(Math.random() * 4);   // drawn as jagged rubble
     addObj({ body, spec, sc: spec.d, type: 'block', mat, chunk: true, tint, charred, cdirty: !!tint });
   }
   const c = MAT_DUST[mat] || [.6, .6, .6];

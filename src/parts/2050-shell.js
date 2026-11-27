@@ -128,7 +128,7 @@ function openSettings() {
     for (const [k, t] of [['auto', 'Auto'], ['high', 'High'], ['low', 'Balanced'], ['lite', 'Light']]) { const b = document.createElement('button'); b.textContent = t; b.className = SAVE.qmode === k ? 'on' : '';
       b.onclick = () => { SAVE.qmode = k; if (k !== 'auto') SAVE.quality = k; else SAVE.quality = autoTier(); gov.done = k !== 'auto'; persist(); applyQuality(); openSettings(); }; s.appendChild(b); }
     B.appendChild(s); B.insertAdjacentHTML('beforeend', '<div class="sub" style="margin:0 2px">Auto picks a level for your device and steps down if the game slows. High adds glow; Light turns off shadows and trims effects for older phones.</div>'); }
-  tog('workerChk', 'Background physics (beta)', 'Runs physics on a separate thread so the screen stays smooth in huge collapses. Reloads the game.', !!SAVE.physWorker, async v => {
+  tog('workerChk', 'Background physics', 'Runs physics on its own thread so the screen and touch stay smooth in big collapses. On by default on most phones. Reloads the game.', P.mode === 'worker', async v => {
     SAVE.physWorker = v; persist();
     if (await confirmDlg('Reload now?', 'Background physics takes effect after a reload. Your progress is saved.', 'Reload')) location.reload(); });
   lab('Controls');

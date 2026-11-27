@@ -30,6 +30,9 @@ export function createEngine(RAPIER) {
   // It turns back into a normal body when hit, pushed or blasted, when something it rests on moves or disappears, or
   // when an earthquake starts. Nothing ever leaves the simulation and nothing is forced to sleep.
   const STILL_V2 = .08 * .08, STILL_W2 = .2 * .2, STILL_T = .8, HIT_V = .6, MOVED_V2 = .3 * .3, CHECK = 20;
+  // in a big collapse (600+ moving), rubble that has nearly stopped settles sooner: the pile gets cheaper as it lands
+  const BUSY = 600, BUSY_V2 = .14 * .14, BUSY_W2 = .35 * .35, BUSY_T = .45;
+  let sV2 = STILL_V2, sW2 = STILL_W2, sT = STILL_T;
   const still = new Map(), frozen = new Set(), dependents = new Map();   // dependents: id -> frozen ids resting on it
   let stepCount = 0;
   function unfreeze(id) {
@@ -112,7 +115,7 @@ export function createEngine(RAPIER) {
   function freezeStill() {
     const ok = [];
     for (const [id, t] of still) {
-      if (t < STILL_T || frozen.has(id) || jointsOf.has(id)) continue;
+      if (t < sT || frozen.has(id) || jointsOf.has(id)) continue;
       const rb = bodies.get(id); if (!rb || rb.isSleeping()) continue;
       let calmNbrs = true; const below = [], y = rb.translation().y;
       world.contactPairsWith(rb.collider(0), c => {
@@ -120,7 +123,7 @@ export function createEngine(RAPIER) {
         const n = byCol.get(c.handle);
         if (n === undefined) return;                      // the ground
         const nb = bodies.get(n);
-        if (!frozen.has(n) && !(nb && nb.isSleeping()) && !(still.get(n) >= STILL_T)) { calmNbrs = false; return; }
+        if (!frozen.has(n) && !(nb && nb.isSleeping()) && !(still.get(n) >= sT)) { calmNbrs = false; return; }
         if (nb && nb.translation().y < y - .05) below.push(n);
       });
       if (calmNbrs) ok.push([id, rb, below]);
@@ -151,8 +154,9 @@ export function createEngine(RAPIER) {
       if (v2 > MOVED_V2 && dependents.has(id)) unfreeze(id);   // it moved: free whatever froze on top of it
       if (!still.has(id)) return;
       const w = rb.angvel();
-      still.set(id, v2 < STILL_V2 && w.x * w.x + w.y * w.y + w.z * w.z < STILL_W2 ? still.get(id) + dt : 0);
+      still.set(id, v2 < sV2 && w.x * w.x + w.y * w.y + w.z * w.z < sW2 ? still.get(id) + dt : 0);
     });
+    const busy = active > BUSY; sV2 = busy ? BUSY_V2 : STILL_V2; sW2 = busy ? BUSY_W2 : STILL_W2; sT = busy ? BUSY_T : STILL_T;
     if (++stepCount % CHECK === 0 && !quake) freezeStill();
   }
 

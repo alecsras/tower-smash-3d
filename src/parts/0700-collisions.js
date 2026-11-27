@@ -38,6 +38,25 @@ function dustPuff(o, impact) {
     spawnSmoke(p.x + Math.cos(a) * r * .6, .15, p.z + Math.sin(a) * r * .6, Math.cos(a) * sp, rand(.3, .8), Math.sin(a) * sp, rand(.9, 1.5), rand(.9, 1.6) * Math.max(.6, r), [.6, .55, .46], .55);
   }
 }
+// When a lot of mass lands in one place, a low cloud of dust rolls out from it (like a real building coming down).
+// Ground impacts are pooled per 3 m cell for a quarter second; cells past the threshold billow, coloured by material.
+const landing = new Map(); let landingT = 0;
+function poolLanding(o, impact) {
+  const p = o.body.position, k = Math.round(p.x / 3) * 1000 + Math.round(p.z / 3);
+  let c = landing.get(k); if (!c) landing.set(k, c = { e: 0, x: 0, z: 0, n: 0, col: MAT_DUST[o.mat] || [.6, .55, .46] });
+  const e = Math.min(o.body.mass, 400) * impact; c.e += e; c.x += p.x * e; c.z += p.z * e; c.n++;
+}
+function billowDust() {
+  if (simTime - landingT < .25) return; landingT = simTime;
+  const q = SAVE.quality === 'high' ? 1 : SAVE.quality === 'lite' ? .3 : .6;
+  for (const c of landing.values()) {
+    if (c.e < 900 || c.n < 3) continue;
+    const cx = c.x / c.e, cz = c.z / c.e, size = Math.min(3, Math.sqrt(c.e) / 40), n = Math.round(Math.min(14, 3 + c.e / 700) * q);
+    for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, sp = rand(1.2, 3.2) * size, col = c.col.map(v => v * .55 + .3);
+      spawnSmoke(cx + Math.cos(a) * size * .8, rand(.2, .7), cz + Math.sin(a) * size * .8, Math.cos(a) * sp, rand(.15, .6), Math.sin(a) * sp, rand(2.6, 4.6), rand(1.6, 2.8) * Math.max(.8, size), col, .5); }
+  }
+  landing.clear();
+}
 function onHit(a, b, impact) { if (a && a.userData) handleHit(a.userData, b, impact); if (b && b.userData) handleHit(b.userData, a, impact); }
 function handleHit(o, other, impact) {
   if (o.gone) return;
@@ -53,6 +72,7 @@ function handleHit(o, other, impact) {
   if (o.type === 'proj' && impact > 9 && performance.now() - lastBuzz > 120) { lastBuzz = performance.now(); try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
   // F5 impact feel: dust where heavy blocks hit the ground; a camera kick for big direct hits
   if (!other && o.type === 'block' && impact > 5 && dustBudget > 0) dustPuff(o, impact);
+  if (!other && o.type === 'block' && impact > 3) poolLanding(o, impact);
   if (o.type === 'proj' && other && impact > 12) shake = Math.max(shake, Math.min(.45, impact / 70));
   if (impact > 2.5 && o.type !== 'shard') {
     const t = performance.now();

@@ -4,8 +4,8 @@
 import { expect } from '@playwright/test';
 import { open } from './helpers.mjs';
 
-export async function tapThrough(page, cats, { settle = 2500 } = {}) {
-  const errors = await open(page);
+export async function tapThrough(page, cats, { settle = 2500, query = '' } = {}) {
+  const errors = await open(page, { query });
   await page.evaluate(() => { const g = window.__game; g.SAVE.sandbox = true; g.setMode('throw'); });
   const bad = [], seen = [];
   for (const cat of cats) {

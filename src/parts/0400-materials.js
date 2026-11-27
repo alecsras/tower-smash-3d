@@ -112,6 +112,25 @@ const specHeight = s => s.shape === 'cyl' ? s.d[2] : s.d[1];
 
 // ---- instanced rendering: one draw call per (shape, material), so 1000-block builds stay smooth ----
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+// Broken chunks draw as jagged rubble: a unit box with chipped corners and dented, faceted faces. Four variants,
+// picked at random per chunk. Only the look changes: the physics collider is still the plain box, so it's no slower.
+const CHUNK_GEOS = [0, 1, 2, 3].map(seed => {
+  const g = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2), p = g.attributes.position;
+  let s = seed * 9301 + 49297; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  const moved = new Map();   // keep shared corners/edges welded so the chunk has no cracks
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), key = `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`;
+    let v = moved.get(key);
+    if (!v) {
+      const edge = (Math.abs(x) > .49) + (Math.abs(y) > .49) + (Math.abs(z) > .49);   // 3 = corner, 2 = edge, 1 = face centre
+      const inset = edge === 3 ? .12 + rnd() * .16 : edge === 2 ? .03 + rnd() * .09 : rnd() * .07;
+      const k = 1 - inset * 2;
+      v = [x * k + (rnd() - .5) * .05, y * k + (rnd() - .5) * .05, z * k + (rnd() - .5) * .05]; moved.set(key, v);
+    }
+    p.setXYZ(i, v[0], v[1], v[2]);
+  }
+  const f = g.toNonIndexed(); f.computeVertexNormals(); g.dispose(); return f;   // non-indexed: each facet catches light on its own
+});
 const batches = new Map(), batchMeshes = [];
 const _m4 = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 class Batch {
@@ -151,9 +170,10 @@ function writeMatrix(o) {
   o.batch.mesh.setMatrixAt(o.bi, _m4.compose(_p, _q, _s)); o.mdirty = !!o.pop;
 }
 function batchFor(spec) {
-  const unit = spec.shape === 'box', key = (unit ? 'box' : specKey(spec)) + '|' + spec.mat;
+  const unit = spec.shape === 'box', chunk = unit && spec.chunk != null ? spec.chunk % CHUNK_GEOS.length : -1;
+  const key = (chunk >= 0 ? 'chunk' + chunk : unit ? 'box' : specKey(spec)) + '|' + spec.mat;
   let b = batches.get(key);
-  if (!b) { b = new Batch(unit ? UNIT_BOX : specGeo(spec), MATS[spec.mat], spec.mat !== 'glass'); batches.set(key, b); }
+  if (!b) { b = new Batch(chunk >= 0 ? CHUNK_GEOS[chunk] : unit ? UNIT_BOX : specGeo(spec), MATS[spec.mat], spec.mat !== 'glass'); batches.set(key, b); }
   return b;
 }
 function pickables() { for (const m of batchMeshes) { m.boundingSphere = null; m.boundingBox = null; } return batchMeshes; }

@@ -1,9 +1,17 @@
 // ================= physics =================
-// The engine (Rapier 0.14 + engine.js) is embedded as text; it runs in a Web Worker when enabled, else on the main thread.
-const PHYS_WORKER = /[?&]worker=1\b/.test(location.search) || (SAVE.physWorker === true && !/[?&]worker=0\b/.test(location.search));
+// The engine (Rapier 0.15 + engine.js) is embedded as text. It runs in a Web Worker (its own thread, so the screen and
+// touch stay smooth while a big collapse is computed) on devices with 4+ cores, unless turned off in Settings.
+// Automated tests keep the main thread so they can step physics directly; ?worker=1 / ?worker=0 force either way.
+const WORKER_AUTO = typeof Worker !== 'undefined' && (navigator.hardwareConcurrency || 2) >= 4 && !navigator.webdriver;
+const PHYS_WORKER = /[?&]worker=1\b/.test(location.search) || (!/[?&]worker=0\b/.test(location.search) && (SAVE.physWorker === true || (SAVE.physWorker == null && WORKER_AUTO)));
 bootStep(.55, 'Starting the physics engine…');
 let P;
-try { P = await makePhysics({ src: document.getElementById('engineSrc').textContent, worker: PHYS_WORKER }); } catch (e) { bootFail(); throw e; }
+const ENGINE_SRC = document.getElementById('engineSrc').textContent;
+try { P = await makePhysics({ src: ENGINE_SRC, worker: PHYS_WORKER }); }
+catch (e) {
+  if (!PHYS_WORKER) { bootFail(); throw e; }
+  try { P = await makePhysics({ src: ENGINE_SRC, worker: false }); } catch (e2) { bootFail(); throw e2; }   // no worker here: physics on the main thread
+}
 bootStep(.8, 'Raising the castle…');
 
 // ---- Dormant blocks: resting pieces far from any action are drawn but NOT simulated. ----
